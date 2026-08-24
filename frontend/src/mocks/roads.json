@@ -1,0 +1,56 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "R-501",
+      "properties": {
+        "id": "R-501",
+        "name": "Mahatma Gandhi Main Road (60ft Sector Arterial)",
+        "surface": "Asphalt",
+        "width_m": 18.0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [77.5915, 12.9724],
+          [77.5982, 12.9724]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "R-502",
+      "properties": {
+        "id": "R-502",
+        "name": "Sector 4 Feeder Collector",
+        "surface": "Concrete",
+        "width_m": 10.0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [77.5936, 12.9705],
+          [77.5936, 12.9745]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "R-503",
+      "properties": {
+        "id": "R-503",
+        "name": "East Link Service Lane",
+        "surface": "Asphalt",
+        "width_m": 8.0
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [77.5956, 12.9705],
+          [77.5956, 12.9745]
+        ]
+      }
+    }
+  ]
+}

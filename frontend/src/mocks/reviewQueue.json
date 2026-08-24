@@ -1,0 +1,50 @@
+[
+  {
+    "id": "Q-101",
+    "parcel_id": "P-1024",
+    "feature_type": "Parcel Polygon",
+    "confidence_score": 0.62,
+    "confidence_band": "MEDIUM",
+    "issue": "Road Buffer Overlap (1.8m)",
+    "severity": "high",
+    "status": "needs_review",
+    "jurisdiction": "Bengaluru East Municipal Corp",
+    "created_at": "2026-08-24T10:15:00+05:30"
+  },
+  {
+    "id": "Q-102",
+    "parcel_id": "P-1025",
+    "feature_type": "Parcel Polygon",
+    "confidence_score": 0.42,
+    "confidence_band": "LOW",
+    "issue": "Canopy Shadow Low Confidence & Boundary Gap (0.9m)",
+    "severity": "high",
+    "status": "needs_review",
+    "jurisdiction": "Bengaluru East Municipal Corp",
+    "created_at": "2026-08-24T08:45:00+05:30"
+  },
+  {
+    "id": "Q-103",
+    "parcel_id": "P-1027",
+    "feature_type": "Parcel Polygon",
+    "confidence_score": 0.55,
+    "confidence_band": "MEDIUM",
+    "issue": "NW Vertex Self-Intersection",
+    "severity": "medium",
+    "status": "needs_review",
+    "jurisdiction": "Bengaluru East Municipal Corp",
+    "created_at": "2026-08-24T09:12:00+05:30"
+  },
+  {
+    "id": "Q-104",
+    "parcel_id": "P-1028",
+    "feature_type": "Parcel Polygon",
+    "confidence_score": 0.38,
+    "confidence_band": "LOW",
+    "issue": "Drainage Ditch Boundary Discrepancy",
+    "severity": "high",
+    "status": "rejected",
+    "jurisdiction": "Bengaluru East Municipal Corp",
+    "created_at": "2026-08-24T07:20:00+05:30"
+  }
+]

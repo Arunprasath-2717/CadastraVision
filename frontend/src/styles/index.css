@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-pastel-bg text-pastel-text font-sans antialiased;
+    color-scheme: light;
+  }
+}
+
+/* Custom soft scrollbars for dense GIS tables & panels */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F0F2F7;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Pastel Glassmorphism & Soft Card Utility Classes */
+.pastel-card {
+  background: #FFFFFF;
+  border: 1px solid #DDE2EC;
+  box-shadow: 0 4px 16px rgba(39, 48, 68, 0.05);
+}
+
+.pastel-glass {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(221, 226, 236, 0.8);
+  box-shadow: 0 8px 24px rgba(39, 48, 68, 0.06);
+}
+
+.pastel-card-hover {
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.pastel-card-hover:hover {
+  background: #FAFAFD;
+  border-color: #8FA7E8;
+  box-shadow: 0 8px 24px rgba(88, 118, 201, 0.12);
+}
+
+/* Interactive Hero Typography Styling */
+.hero-title-letter {
+  display: inline-block;
+  transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), color 0.3s ease, text-shadow 0.3s ease;
+  will-change: transform;
+}
+
+/* Topographic Grid Texture for Light Pastel Theme */
+.topo-grid-pastel {
+  background-image: 
+    radial-gradient(circle at 50% 50%, rgba(143, 167, 232, 0.12) 0%, transparent 65%),
+    linear-gradient(to right, rgba(221, 226, 236, 0.4) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(221, 226, 236, 0.4) 1px, transparent 1px);
+  background-size: 100% 100%, 36px 36px, 36px 36px;
+}
+
+/* MapLibre custom overrides for light pastel workstation */
+.maplibregl-popup-content {
+  background: #FFFFFF !important;
+  color: #273044 !important;
+  border: 1px solid #DDE2EC !important;
+  border-radius: 10px !important;
+  box-shadow: 0 10px 25px rgba(39, 48, 68, 0.12) !important;
+  padding: 12px 16px !important;
+}
+
+.maplibregl-popup-anchor-top .maplibregl-popup-tip { border-bottom-color: #FFFFFF !important; }
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip { border-top-color: #FFFFFF !important; }
+.maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: #FFFFFF !important; }
+.maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: #FFFFFF !important; }
+
+/* Accessible Focus States */
+:focus-visible {
+  outline: 2px solid #5876C9;
+  outline-offset: 2px;
+}
