@@ -1,0 +1,29 @@
+# Python bytecode and caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Model checkpoints / weights (huge binary files)
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.onnx
+
+# Local configuration and environment files
+.env
+.venv/
+env/
+venv/
+
+# Large visual artifacts, GeoTIFFs, outputs
+*.tif
+*.tiff
+*.png
+*.jpg
+*.jpeg
+*.geojson
+output_visualized.png
+cache/
+temp/
