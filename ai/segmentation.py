@@ -92,7 +92,7 @@ class CadastralSegmentationPipeline:
         self.orthogonalize = True  # Snap segment corners to perfectly orthogonal 90-degree angles
         self.min_regularity = 0.60  # Filter out highly irregular structures (trees, grass)
         self.min_compactness = 0.35
-        self.max_area_ratio = 0.08  # Max area ratio of a tile for a single parcel (filters out background blocks)
+        self.max_area_ratio = 0.70  # Max area ratio of a tile for a single parcel (filters out background blocks)
 
         self.model: Any = None
         self.model_version: str = "unknown"
@@ -735,8 +735,8 @@ class CadastralSegmentationPipeline:
                     inv_transform = ~window_transform
 
                     for mask in tile_masks:
-                        # Extract polygons in native CRS space (using min_area=3000.0 pixel area)
-                        crs_polygons = self.mask_to_polygons(mask, window_transform, min_area=3000.0)
+                        # Extract polygons in native CRS space (using min_area=1000.0 pixel area)
+                        crs_polygons = self.mask_to_polygons(mask, window_transform, min_area=1000.0)
 
                         for crs_poly in crs_polygons:
                             local_poly = self._transform_polygon(crs_poly, inv_transform)
@@ -787,8 +787,8 @@ class CadastralSegmentationPipeline:
                                 }
                             })
 
-        # Merge overlapping and touching segments in metric CRS space (bridging 3.5m gaps)
-        merged = self._merge_overlapping_polygons(features, buffer_dist=3.5)
+        # Merge overlapping and touching segments in metric CRS space (bridging 1.2m gaps)
+        merged = self._merge_overlapping_polygons(features, buffer_dist=1.2)
 
         # De-duplicate remaining boundaries via Spatial NMS
         deduplicated = self._polygon_nms(merged, iou_threshold=0.40)
