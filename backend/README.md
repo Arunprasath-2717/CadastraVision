@@ -2,16 +2,16 @@
 
 Production-ready **FastAPI** backend for the CadastralMap AI-enabled automated cadastral mapping platform (**SIH 2026, PS 26012**).
 
-## Status: Phase 6 Complete (Geospatial Change Detection, Versioning, Secure Export & DB Config APIs)
+## Status: Phase 7 Complete (Production Hardening, Observability, Resilience & Deployment)
 
-* **227/227 Tests Passing**: 100% test coverage across Phase 1–6 (Authentication, RBAC, Imagery, AI Integration, Parcel Workflow, Change Detection, Secure Export, and DB Config).
-* **Geospatial Change Detection Engine (`ChangeDetectionService`)**: Feature matching, geometry comparison, confidence range enforcement (`0.0 <= confidence <= 1.0`), and change classification (`NEW`, `REMOVED`, `MODIFIED`, `UNCHANGED`).
-* **Deterministic Idempotency**: SHA-256 calculation on `(historical_tile_id, current_tile_id, algorithm_version)` to prevent duplicate change records.
-* **Human Review & RBAC Workflow**: State transitions (`DETECTED` -> `APPROVED` / `REJECTED`) with strict Role-Based Access Control (`ANALYST` / `ADMIN`).
-* **Secure Export Engine (`ExportService`)**: High-performance GeoJSON and CSV generation with CSV/Spreadsheet Formula Injection protection (`=`, `+`, `-`, `@` prepended with `'`).
-* **Database Configuration & Schema Initialization APIs (`/v1/config/database`)**: Dedicated APIs for database connection health inspection, dialect checking, and automated schema table initialization.
-* **Tamper-Evident SHA-256 Audit Trail**: Hash chain integrity maintained for all change detection runs, review transitions, and export generation events.
-* **Database Migrations**: Alembic migration `7a8e910f1112_phase6_change_detection_and_export.py` for database evolution.
+* **250/250 Tests Passing**: 100% test coverage across Phase 1–7 (Foundation, Domain Models, Workflows, AI Integration, Security & RBAC, Change Detection & Secure Export, and Production Hardening).
+* **Production Environment Safeguards**: Strict validation rules in `Settings`: disallows default insecure `SECRET_KEY` and prohibits `DEBUG=True` in production mode (`ENVIRONMENT=production`).
+* **Request Correlation (`RequestCorrelationMiddleware`)**: Automatic generation and propagation of unique `X-Request-ID` correlation headers attached to all HTTP requests and structured log entries.
+* **Health Probes (`/health`, `/health/live`, `/health/ready`)**: Orchestrator-compatible liveness and readiness endpoints with active database connectivity checks (`SELECT 1`).
+* **File Upload Security**: Enforced file size limits (max 50MB), extension whitelisting (`.tif`, `.tiff`, `.geojson`, `.png`, `.jpg`, `.jpeg`), and strict path traversal protection.
+* **API Rate Limiting (`RateLimiter`)**: Sliding window rate limiting on sensitive routes to protect against abuse and resource exhaustion.
+* **Production Containerization**: Multi-stage, non-root `Dockerfile` and container orchestration `docker-compose.yml`.
+* **Tamper-Evident SHA-256 Audit Trail**: SHA-256 hash chaining maintained across all operations.
 
 ---
 

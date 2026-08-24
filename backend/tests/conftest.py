@@ -124,3 +124,135 @@ async def unauth_client(db_session: AsyncSession):
     ) as ac:
         yield ac
 
+
+@pytest_asyncio.fixture
+async def phase6_setup(db_session: AsyncSession):
+    """Seed imagery tiles and feature footprints for historical vs current comparison."""
+    import uuid
+    from sqlalchemy import select
+    from app.core.security import hash_password
+    from app.models.feature import BuildingFootprint, FeatureType
+    from app.models.imagery import ImageryTile, TileSource, TileStatus
+    from app.models.parcel import Parcel, ParcelWorkflowStatus
+    from app.models.user import User, UserRole
+
+    async def _get_or_create_user(email: str, name: str, role: UserRole) -> User:
+        stmt = select(User).where(User.email == email)
+        res = (await db_session.execute(stmt)).scalars().first()
+        if not res:
+            res = User(
+                id=str(uuid.uuid4()),
+                email=email,
+                hashed_password=hash_password("Pass123!"),
+                full_name=name,
+                role=role,
+            )
+            db_session.add(res)
+            await db_session.flush()
+        return res
+
+    admin = await _get_or_create_user("p6_admin@example.com", "P6 Admin", UserRole.ADMIN)
+    analyst = await _get_or_create_user("p6_analyst@example.com", "P6 Analyst", UserRole.ANALYST)
+    viewer = await _get_or_create_user("p6_viewer@example.com", "P6 Viewer", UserRole.VIEWER)
+
+    hist_tile = ImageryTile(
+        id=str(uuid.uuid4()),
+        filename="hist_2020.tif",
+        file_path="/tmp/hist_2020.tif",
+        acquisition_date="2020-01-01",
+        dataset_version="v1.0",
+        is_historical=True,
+        source=TileSource.SATELLITE,
+        status=TileStatus.PROCESSED,
+    )
+    curr_tile = ImageryTile(
+        id=str(uuid.uuid4()),
+        filename="curr_2024.tif",
+        file_path="/tmp/curr_2024.tif",
+        acquisition_date="2024-01-01",
+        dataset_version="v2.0",
+        is_historical=False,
+        source=TileSource.SATELLITE,
+        status=TileStatus.PROCESSED,
+    )
+    db_session.add_all([hist_tile, curr_tile])
+    await db_session.flush()
+
+    parcel = Parcel(
+        id=str(uuid.uuid4()),
+        geometry_wkt="POLYGON((0 0, 0 10, 10 10, 10 0, 0 0))",
+        zone="Zone A",
+        jurisdiction="District 1",
+        workflow_status=ParcelWorkflowStatus.VALIDATED,
+    )
+    db_session.add(parcel)
+    await db_session.flush()
+
+    f1_hist = BuildingFootprint(
+        id=str(uuid.uuid4()),
+        tile_id=hist_tile.id,
+        parcel_id=parcel.id,
+        feature_type=FeatureType.BUILDING,
+        geometry_wkt="POLYGON((1 1, 1 3, 3 3, 3 1, 1 1))",
+        confidence=0.95,
+    )
+    f2_hist = BuildingFootprint(
+        id=str(uuid.uuid4()),
+        tile_id=hist_tile.id,
+        parcel_id=parcel.id,
+        feature_type=FeatureType.BUILDING,
+        geometry_wkt="POLYGON((4 4, 4 6, 6 6, 6 4, 4 4))",
+        confidence=0.90,
+    )
+    f3_hist = BuildingFootprint(
+        id=str(uuid.uuid4()),
+        tile_id=hist_tile.id,
+        parcel_id=parcel.id,
+        feature_type=FeatureType.ROAD,
+        geometry_wkt="POLYGON((7 7, 7 8, 8 8, 8 7, 7 7))",
+        confidence=0.88,
+    )
+
+    f1_curr = BuildingFootprint(
+        id=str(uuid.uuid4()),
+        tile_id=curr_tile.id,
+        parcel_id=parcel.id,
+        feature_type=FeatureType.BUILDING,
+        geometry_wkt="POLYGON((1 1, 1 3, 3 3, 3 1, 1 1))",
+        confidence=0.95,
+    )
+    f2_curr = BuildingFootprint(
+        id=str(uuid.uuid4()),
+        tile_id=curr_tile.id,
+        parcel_id=parcel.id,
+        feature_type=FeatureType.BUILDING,
+        geometry_wkt="POLYGON((4 4, 4 7, 7 7, 7 4, 4 4))",
+        confidence=0.92,
+    )
+    f4_curr = BuildingFootprint(
+        id=str(uuid.uuid4()),
+        tile_id=curr_tile.id,
+        parcel_id=parcel.id,
+        feature_type=FeatureType.WATER,
+        geometry_wkt="POLYGON((8 1, 8 3, 9 3, 9 1, 8 1))",
+        confidence=0.85,
+    )
+
+    db_session.add_all([f1_hist, f2_hist, f3_hist, f1_curr, f2_curr, f4_curr])
+    await db_session.commit()
+
+    return {
+        "admin": admin,
+        "analyst": analyst,
+        "viewer": viewer,
+        "hist_tile": hist_tile,
+        "curr_tile": curr_tile,
+        "parcel": parcel,
+        "f1_hist": f1_hist,
+        "f2_hist": f2_hist,
+        "f3_hist": f3_hist,
+        "f1_curr": f1_curr,
+        "f2_curr": f2_curr,
+        "f4_curr": f4_curr,
+    }
+

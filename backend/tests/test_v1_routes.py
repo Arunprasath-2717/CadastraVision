@@ -79,7 +79,7 @@ async def test_openapi_v1_prefix(client: AsyncClient):
     """All domain routes must use /v1 prefix."""
     response = await client.get("/openapi.json")
     spec = response.json()
-    domain_paths = [p for p in spec["paths"] if p != "/health"]
+    domain_paths = [p for p in spec["paths"] if not p.startswith("/health")]
     non_v1 = [p for p in domain_paths if not p.startswith("/v1/")]
     assert not non_v1, f"Non-/v1 domain paths found: {non_v1}"
 

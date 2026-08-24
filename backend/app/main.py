@@ -62,6 +62,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # ── Observability & Request Correlation ────────────────────────────────────
+    from app.core.middleware import RequestCorrelationMiddleware
+    app.add_middleware(RequestCorrelationMiddleware)
+
     # ── CORS ──────────────────────────────────────────────────────────────────
     app.add_middleware(
         CORSMiddleware,

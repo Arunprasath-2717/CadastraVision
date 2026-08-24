@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,11 +52,34 @@ async def upload_imagery(
     current_user: User = Depends(require_role(UserRole.ANALYST, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> UploadResponse:
-    upload_dir = "/tmp/cadastravision_uploads"
-    os.makedirs(upload_dir, exist_ok=True)
-    file_path = os.path.join(upload_dir, file.filename or "tile.tif")
+    raw_filename = file.filename or "tile.tif"
+    clean_filename = os.path.basename(raw_filename)
+    if ".." in raw_filename or "/" in raw_filename or "\\" in raw_filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid filename: path traversal characters detected",
+        )
+
+    ext = os.path.splitext(clean_filename)[1].lower()
+    allowed_exts = {".tif", ".tiff", ".geojson", ".png", ".jpg", ".jpeg"}
+    if ext and ext not in allowed_exts:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file format '{ext}'. Allowed extensions: {', '.join(sorted(allowed_exts))}",
+        )
 
     contents = await file.read()
+    max_size = 50 * 1024 * 1024  # 50MB limit
+    if len(contents) > max_size:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="File size exceeds maximum allowed limit of 50MB.",
+        )
+
+    upload_dir = "/tmp/cadastravision_uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, clean_filename)
+
     with open(file_path, "wb") as f:
         f.write(contents)
 

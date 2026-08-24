@@ -12,7 +12,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AnyUrl, field_validator
+from pydantic import AnyUrl, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -45,6 +45,15 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "DEBUG"
 
     # ── Derived helpers ───────────────────────────────────────────────────────
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        if self.ENVIRONMENT == "production":
+            if self.SECRET_KEY == "INSECURE_CHANGE_ME_IN_PRODUCTION" or len(self.SECRET_KEY) < 16:
+                raise ValueError("Insecure or default SECRET_KEY is prohibited in production environment.")
+            if self.DEBUG:
+                raise ValueError("DEBUG mode must be False in production environment.")
+        return self
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Return CORS_ORIGINS as a Python list."""
