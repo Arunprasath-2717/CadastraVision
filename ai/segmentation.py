@@ -90,8 +90,9 @@ class CadastralSegmentationPipeline:
         self.pixel_tolerance = 0.5  # Simplification tolerance in pixel space
         self.crs_tolerance = 0.00005  # Simplification tolerance in CRS space (geographic degrees)
         self.orthogonalize = True  # Snap segment corners to perfectly orthogonal 90-degree angles
-        self.min_regularity = 0.60  # Filter out irregular shapes like trees and shadow noise
+        self.min_regularity = 0.60  # Filter out highly irregular structures (trees, grass)
         self.min_compactness = 0.35
+        self.max_area_ratio = 0.08  # Max area ratio of a tile for a single parcel (filters out background blocks)
 
         self.model: Any = None
         self.model_version: str = "unknown"
@@ -658,8 +659,8 @@ class CadastralSegmentationPipeline:
                             if (max_x - min_x) >= (tile_w - 2) and (max_y - min_y) >= (tile_h - 2):
                                 continue
 
-                            # Discard segments covering more than 70% of the tile area
-                            if local_poly.area > 0.70 * (tile_w * tile_h):
+                            # Discard segments covering more than max_area_ratio of the tile area
+                            if local_poly.area > self.max_area_ratio * (tile_w * tile_h):
                                 continue
 
                             # Clip local coordinates to sub-tile bounds
