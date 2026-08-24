@@ -86,9 +86,12 @@ class CadastralSegmentationPipeline:
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         self.model_path = model_path
 
-        # Geometric tolerances
+        # Geometric tolerances and post-processing filters
         self.pixel_tolerance = 0.5  # Simplification tolerance in pixel space
         self.crs_tolerance = 0.00005  # Simplification tolerance in CRS space (geographic degrees)
+        self.orthogonalize = True  # Snap segment corners to perfectly orthogonal 90-degree angles
+        self.min_regularity = 0.60  # Filter out irregular shapes like trees and shadow noise
+        self.min_compactness = 0.35
 
         self.model: Any = None
         self.model_version: str = "unknown"
@@ -399,6 +402,107 @@ class CadastralSegmentationPipeline:
             interiors_trans.append([affine_transform * (x, y) for x, y in interior.coords])
         return Polygon(exterior_trans, interiors_trans)
 
+    def _orthogonalize_polygon(self, poly: Polygon) -> Polygon:
+        """
+        Orthogonalizes a polygon so that all angles are snapped to 90 degrees
+        relative to its dominant orientation. Highly critical for production-grade
+        cadastral parcel and building mapping.
+        """
+        if not poly.is_valid or poly.is_empty:
+            return poly
+            
+        try:
+            # 1. Find dominant orientation using the minimum rotated rectangle
+            min_rect = poly.minimum_rotated_rectangle
+            coords = list(min_rect.exterior.coords)
+            if len(coords) < 4:
+                return poly
+                
+            # Get vector of the longest edge of the minimum rotated rectangle
+            p0, p1, p2 = coords[0], coords[1], coords[2]
+            d1 = np.array([p1[0] - p0[0], p1[1] - p0[1]])
+            d2 = np.array([p2[0] - p1[0], p2[1] - p1[1]])
+            longest = d1 if np.linalg.norm(d1) > np.linalg.norm(d2) else d2
+            
+            # Compute angle in radians
+            angle = np.arctan2(longest[1], longest[0])
+            
+            # 2. Rotate polygon back to align dominant orientation to 0 degrees
+            cos_a, sin_a = np.cos(-angle), np.sin(-angle)
+            
+            def rotate_point(x, y, origin=(0, 0)):
+                ox, oy = origin
+                rx = ox + cos_a * (x - ox) - sin_a * (y - oy)
+                ry = oy + sin_a * (x - ox) + cos_a * (y - oy)
+                return rx, ry
+                
+            # Rotate the exterior coordinates
+            ext_coords = list(poly.exterior.coords)
+            rotated_ext = [rotate_point(x, y) for x, y in ext_coords]
+            
+            # 3. Snap vertices to make segments perfectly horizontal or vertical
+            snapped_ext = []
+            n = len(rotated_ext)
+            for i in range(n):
+                if i == 0:
+                    snapped_ext.append(rotated_ext[i])
+                    continue
+                    
+                prev_x, prev_y = snapped_ext[-1]
+                curr_x, curr_y = rotated_ext[i]
+                
+                dx = abs(curr_x - prev_x)
+                dy = abs(curr_y - prev_y)
+                
+                if dx > dy:
+                    # Horizontal segment: snap Y to match previous Y
+                    snapped_ext.append((curr_x, prev_y))
+                else:
+                    # Vertical segment: snap X to match previous X
+                    snapped_ext.append((prev_x, curr_y))
+                    
+            # Close the loop
+            if snapped_ext:
+                snapped_ext[-1] = snapped_ext[0]
+                
+            # 4. Rotate back to original orientation
+            cos_back, sin_back = np.cos(angle), np.sin(angle)
+            
+            def rotate_point_back(x, y, origin=(0, 0)):
+                ox, oy = origin
+                rx = ox + cos_back * (x - ox) - sin_back * (y - oy)
+                ry = oy + sin_back * (x - ox) + cos_back * (y - oy)
+                return rx, ry
+                
+            final_ext = [rotate_point_back(x, y) for x, y in snapped_ext]
+            
+            # Clean up interiors similarly if any
+            final_interiors = []
+            for interior in poly.interiors:
+                rot_int = [rotate_point(x, y) for x, y in interior.coords]
+                snapped_int = []
+                for i in range(len(rot_int)):
+                    if i == 0:
+                        snapped_int.append(rot_int[i])
+                        continue
+                    prev_x, prev_y = snapped_int[-1]
+                    curr_x, curr_y = rot_int[i]
+                    if abs(curr_x - prev_x) > abs(curr_y - prev_y):
+                        snapped_int.append((curr_x, prev_y))
+                    else:
+                        snapped_int.append((prev_x, curr_y))
+                if snapped_int:
+                    snapped_int[-1] = snapped_int[0]
+                final_interiors.append([rotate_point_back(x, y) for x, y in snapped_int])
+                
+            res_poly = Polygon(final_ext, final_interiors)
+            if res_poly.is_valid and not res_poly.is_empty:
+                return res_poly
+        except Exception as e:
+            logger.warning(f"Failed to orthogonalize polygon: {e}")
+            
+        return poly
+
     def _compute_polygon_iou(self, poly1: Polygon, poly2: Polygon) -> float:
         """Computes spatial Intersection-over-Union (IoU) of two polygons."""
         try:
@@ -562,6 +666,14 @@ class CadastralSegmentationPipeline:
 
                             # Compute explainable confidence score
                             confidence_score, breakdown = self.compute_confidence(mask_crop, local_poly)
+
+                            # Discard highly organic/irregular shapes like trees and shadow noise
+                            if breakdown["regularity"] < self.min_regularity or breakdown["compactness"] < self.min_compactness:
+                                continue
+
+                            # Orthogonalize polygon to snap all edges to 90-degree corners (production-grade)
+                            if self.orthogonalize:
+                                crs_poly = self._orthogonalize_polygon(crs_poly)
 
                             # Coordinate conversion to WGS84
                             if project_fn is not None:
