@@ -653,6 +653,15 @@ class CadastralSegmentationPipeline:
                                 int(np.ceil(max_y)),
                             )
 
+                            # Discard full-tile background segments (touching all borders)
+                            tile_h, tile_w = mask.shape
+                            if (max_x - min_x) >= (tile_w - 2) and (max_y - min_y) >= (tile_h - 2):
+                                continue
+
+                            # Discard segments covering more than 70% of the tile area
+                            if local_poly.area > 0.70 * (tile_w * tile_h):
+                                continue
+
                             # Clip local coordinates to sub-tile bounds
                             min_x = max(0, min_x)
                             min_y = max(0, min_y)
