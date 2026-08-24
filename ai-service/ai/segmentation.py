@@ -403,14 +403,21 @@ class CadastralSegmentationPipeline:
             interiors_trans.append([affine_transform * (x, y) for x, y in interior.coords])
         return Polygon(exterior_trans, interiors_trans)
 
-    def _orthogonalize_polygon(self, poly: Polygon) -> Polygon:
+    def _orthogonalize_polygon(self, poly: Any) -> Any:
         """
-        Orthogonalizes a polygon so that all angles are snapped to 90 degrees
+        Orthogonalizes a Polygon or MultiPolygon so that all angles are snapped to 90 degrees
         relative to its dominant orientation. Highly critical for production-grade
         cadastral parcel and building mapping.
         """
         if not poly.is_valid or poly.is_empty:
             return poly
+
+        from shapely.geometry import MultiPolygon
+        if isinstance(poly, MultiPolygon):
+            ortho_geoms = []
+            for geom in poly.geoms:
+                ortho_geoms.append(self._orthogonalize_polygon(geom))
+            return MultiPolygon(ortho_geoms)
             
         try:
             # 1. Find dominant orientation using the minimum rotated rectangle
@@ -536,11 +543,12 @@ class CadastralSegmentationPipeline:
 
         for feat in sorted_features:
             try:
-                poly = shape(feat["geometry"])
+                geom = feat["geometry"]
+                poly = shape(geom) if isinstance(geom, dict) else geom
                 if not poly.is_valid:
                     poly = poly.buffer(0.0)
-                    if not poly.is_valid or poly.is_empty:
-                        continue
+                if not poly.is_valid or poly.is_empty:
+                    continue
             except Exception:
                 continue
 
@@ -556,6 +564,102 @@ class CadastralSegmentationPipeline:
 
         return keep_features
 
+    def _merge_overlapping_polygons(self, features: list[dict], buffer_dist: float = 1.5) -> list[dict]:
+        """
+        Groups features that intersect/overlap (with buffer_dist meters margin)
+        and merges them using unary_union. This resolves window boundary splitting
+        and groups sub-textures into unified cadastral building/parcel footprints.
+        """
+        if not features:
+            return []
+
+        from shapely.geometry import shape
+        from shapely.ops import unary_union
+
+        # 1. Parse and validate shapes
+        parsed_features = []
+        for feat in features:
+            try:
+                geom = feat["geometry"]
+                poly = shape(geom) if isinstance(geom, dict) else geom
+                if not poly.is_valid:
+                    poly = poly.buffer(0.0)
+                if poly.is_empty or not poly.is_valid:
+                    continue
+                # Buffer outward to bridge gaps
+                buffered = poly.buffer(buffer_dist)
+                parsed_features.append({
+                    "shape": poly,
+                    "buffered_shape": buffered,
+                    "properties": feat["properties"]
+                })
+            except Exception:
+                continue
+
+        # 2. Build adjacency list based on buffered intersections
+        n = len(parsed_features)
+        adj = {i: set() for i in range(n)}
+        for i in range(n):
+            for j in range(i + 1, n):
+                poly_i = parsed_features[i]["buffered_shape"]
+                poly_j = parsed_features[j]["buffered_shape"]
+                if poly_i.intersects(poly_j):
+                    adj[i].add(j)
+                    adj[j].add(i)
+
+        # 3. Find connected components (BFS)
+        visited = set()
+        components = []
+        for i in range(n):
+            if i not in visited:
+                comp = []
+                queue = [i]
+                visited.add(i)
+                while queue:
+                    curr = queue.pop(0)
+                    comp.append(curr)
+                    for neighbor in adj[curr]:
+                        if neighbor not in visited:
+                            visited.add(neighbor)
+                            queue.append(neighbor)
+                components.append(comp)
+
+        # 4. Merge each component
+        merged_features = []
+        for comp in components:
+            shapes_to_union = [parsed_features[idx]["buffered_shape"] for idx in comp]
+            try:
+                union_shape = unary_union(shapes_to_union)
+                # Buffer back inward to restore original dimensions
+                union_shape = union_shape.buffer(-buffer_dist)
+                if not union_shape.is_valid:
+                    union_shape = union_shape.buffer(0.0)
+                if union_shape.is_empty or not union_shape.is_valid:
+                    continue
+                
+                # Apply orthogonalization on the fully merged shape
+                if self.orthogonalize:
+                    union_shape = self._orthogonalize_polygon(union_shape)
+                
+                confidences = [parsed_features[idx]["properties"].get("confidence", 0.0) for idx in comp]
+                avg_confidence = round(sum(confidences) / len(confidences), 2)
+                
+                merged_feat = {
+                    "geometry": union_shape,
+                    "properties": {
+                        "confidence": avg_confidence,
+                        "model_version": parsed_features[comp[0]]["properties"].get("model_version", "unknown"),
+                        "weights_hash": parsed_features[comp[0]]["properties"].get("weights_hash", "unknown"),
+                    }
+                }
+                merged_features.append(merged_feat)
+            except Exception as e:
+                logger.warning(f"Error unioning component: {e}")
+                best_idx = max(comp, key=lambda idx: parsed_features[idx]["properties"].get("confidence", 0.0))
+                merged_features.append(features[best_idx])
+
+        return merged_features
+
     def process_geotiff(
         self,
         geotiff_path: str,
@@ -564,24 +668,16 @@ class CadastralSegmentationPipeline:
     ) -> dict:
         """
         Processes a large GeoTIFF image in 512x512 windows to manage memory consumption.
-        Extracts features, reprojects to EPSG:4326, applies Polygon NMS, and returns GeoJSON.
-
-        Args:
-            geotiff_path: Absolute path to the input GeoTIFF file.
-            chunk_size: Processing sub-tile width/height.
-            overlap: Overlap in pixels between adjacent sub-tiles.
-
-        Returns:
-            A valid OGC-compliant GeoJSON FeatureCollection dictionary.
+        Extracts features, merges adjacent shapes, reprojects to EPSG:4326, and returns GeoJSON.
         """
-        # Check for pre-generated GeoJSON cache for risk mitigation (live demo fallback)
+        # Check for pre-generated GeoJSON cache for risk mitigation
         cache_paths = [
             geotiff_path + ".geojson",
             os.path.splitext(geotiff_path)[0] + ".geojson"
         ]
         for cp in cache_paths:
             if os.path.exists(cp):
-                logger.info(f"Pre-cached GeoJSON found at: {cp}. Falling back to cache for zero-latency presentation rendering.")
+                logger.info(f"Pre-cached GeoJSON found at: {cp}. Falling back to cache.")
                 try:
                     with open(cp, "r") as f:
                         return json.load(f)
@@ -639,8 +735,8 @@ class CadastralSegmentationPipeline:
                     inv_transform = ~window_transform
 
                     for mask in tile_masks:
-                        # Extract polygons in native CRS space
-                        crs_polygons = self.mask_to_polygons(mask, window_transform, min_area=30.0)
+                        # Extract polygons in native CRS space (using min_area=3000.0 pixel area)
+                        crs_polygons = self.mask_to_polygons(mask, window_transform, min_area=3000.0)
 
                         for crs_poly in crs_polygons:
                             local_poly = self._transform_polygon(crs_poly, inv_transform)
@@ -681,43 +777,52 @@ class CadastralSegmentationPipeline:
                             if breakdown["regularity"] < self.min_regularity or breakdown["compactness"] < self.min_compactness:
                                 continue
 
-                            # Orthogonalize polygon to snap all edges to 90-degree corners (production-grade)
-                            if self.orthogonalize:
-                                crs_poly = self._orthogonalize_polygon(crs_poly)
-
-                            # Coordinate conversion to WGS84
-                            if project_fn is not None:
-                                try:
-                                    wgs84_poly = shapely_transform(project_fn, crs_poly)
-                                except Exception as e:
-                                    logger.error(f"Reprojection error: {e}")
-                                    continue
-                            else:
-                                wgs84_poly = crs_poly
-
-                            if wgs84_poly.is_empty or not wgs84_poly.is_valid:
-                                continue
-
-                            # Compile feature dictionary
-                            feature = {
-                                "type": "Feature",
-                                "geometry": mapping(wgs84_poly),
+                            # Compile metric feature
+                            features.append({
+                                "geometry": crs_poly,
                                 "properties": {
                                     "confidence": confidence_score,
-                                    "confidence_breakdown": breakdown,
                                     "model_version": self.model_version,
                                     "weights_hash": self.weights_hash,
-                                },
-                            }
-                            features.append(feature)
+                                }
+                            })
 
-        # De-duplicate overlapping boundaries via Spatial NMS
-        deduplicated = self._polygon_nms(features, iou_threshold=0.40)
-        logger.info(f"GeoTIFF processing completed. Features: {len(features)} -> {len(deduplicated)} (after NMS)")
+        # Merge overlapping and touching segments in metric CRS space (bridging 3.5m gaps)
+        merged = self._merge_overlapping_polygons(features, buffer_dist=3.5)
+
+        # De-duplicate remaining boundaries via Spatial NMS
+        deduplicated = self._polygon_nms(merged, iou_threshold=0.40)
+
+        # Convert final polygons to WGS84 GeoJSON features
+        geojson_features = []
+        for feat in deduplicated:
+            poly_crs = feat["geometry"]
+            
+            # Coordinate conversion to WGS84
+            if project_fn is not None:
+                try:
+                    wgs84_poly = shapely_transform(project_fn, poly_crs)
+                except Exception as e:
+                    logger.error(f"Reprojection error: {e}")
+                    continue
+            else:
+                wgs84_poly = poly_crs
+
+            if wgs84_poly.is_empty or not wgs84_poly.is_valid:
+                continue
+
+            from shapely.geometry import mapping
+            geojson_features.append({
+                "type": "Feature",
+                "geometry": mapping(wgs84_poly),
+                "properties": feat["properties"]
+            })
+
+        logger.info(f"GeoTIFF processing completed. Features: {len(features)} -> {len(geojson_features)} (after Merge + NMS)")
 
         return {
             "type": "FeatureCollection",
-            "features": deduplicated,
+            "features": geojson_features,
             "metadata": {
                 "pii_compliance": "Zero-PII. Operates purely on pixel rasters and vector geometry.",
                 "weights_hash": self.weights_hash,

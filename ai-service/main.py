@@ -210,12 +210,8 @@ def segment_and_visualize(
                     pixel_pts.append([int(col), int(row)])
 
                 pts_array = np.array(pixel_pts, dtype=np.int32)
-                # Draw semi-transparent fill
-                overlay = img_bgr.copy()
-                cv2.fillPoly(overlay, [pts_array], color=(0, 255, 0))
-                cv2.addWeighted(overlay, 0.35, img_bgr, 0.65, 0, img_bgr)
-                # Draw outline
-                cv2.polylines(img_bgr, [pts_array], isClosed=True, color=(0, 255, 0), thickness=2)
+                # Draw outline only in bright yellow (no fill, thickness=3)
+                cv2.polylines(img_bgr, [pts_array], isClosed=True, color=(0, 255, 255), thickness=3)
 
             cv2.imwrite(out_img_path, img_bgr)
 
