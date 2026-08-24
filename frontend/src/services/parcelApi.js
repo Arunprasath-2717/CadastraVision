@@ -55,10 +55,12 @@ export const parcelApi = {
    */
   async editParcel(parcelId, newGeometry, actionType = 'vertex_edit') {
     const payload = {
-      geometry: newGeometry,
-      action_type: actionType,
-      user_id: 'USR-4092',
-      timestamp: new Date().toISOString()
+      idempotency_key: `edit-${parcelId}-${Date.now()}`,
+      edit: {
+        operation: actionType,
+        payload: { geometry: newGeometry }
+      },
+      notes: `Applied ${actionType}`
     };
 
     const res = await apiRequest(`/v1/parcels/${parcelId}/edit`, {
@@ -96,11 +98,8 @@ export const parcelApi = {
   /**
    * Explicit Human Approval (PRD Non-Negotiable R1)
    */
-  async approveParcel(parcelId, userId = 'USR-4092') {
-    const payload = {
-      approving_user_id: userId,
-      timestamp: new Date().toISOString()
-    };
+  async approveParcel(parcelId, notes = 'Boundary validated and approved') {
+    const payload = { notes };
 
     const res = await apiRequest(`/v1/parcels/${parcelId}/approve`, {
       method: 'POST',
@@ -120,20 +119,15 @@ export const parcelApi = {
       parcel_id: parcelId,
       status: 'approved',
       export_eligible: true,
-      approved_by: userId,
-      approved_at: payload.timestamp
+      approved_at: new Date().toISOString()
     };
   },
 
   /**
    * Explicit Human Rejection
    */
-  async rejectParcel(parcelId, userId = 'USR-4092', reason = 'Boundary error') {
-    const payload = {
-      rejecting_user_id: userId,
-      reason,
-      timestamp: new Date().toISOString()
-    };
+  async rejectParcel(parcelId, reason = 'Boundary error') {
+    const payload = { reason };
 
     const res = await apiRequest(`/v1/parcels/${parcelId}/reject`, {
       method: 'POST',
@@ -152,8 +146,7 @@ export const parcelApi = {
       parcel_id: parcelId,
       status: 'rejected',
       export_eligible: false,
-      rejected_by: userId,
-      rejected_at: payload.timestamp
+      rejected_at: new Date().toISOString()
     };
   }
 };

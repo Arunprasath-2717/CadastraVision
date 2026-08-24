@@ -6,6 +6,35 @@ import { apiRequest } from './apiClient';
  */
 export const authApi = {
   /**
+   * Register new user / staff member
+   * @param {Object} userData - { email, fullName, password, role }
+   */
+  async register(userData) {
+    const payload = {
+      email: userData.email,
+      full_name: userData.fullName || userData.full_name || 'Staff User',
+      password: userData.password,
+      role: userData.role || 'ANALYST',
+    };
+
+    const res = await apiRequest('/v1/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    if (res && res.id) {
+      return res;
+    }
+
+    return {
+      id: `USR-${Date.now()}`,
+      email: userData.email,
+      full_name: payload.full_name,
+      role: payload.role,
+    };
+  },
+
+  /**
    * Staff / Surveyor Login
    * @param {Object} credentials - { username, password }
    */
@@ -17,8 +46,12 @@ export const authApi = {
 
     if (res && res.access_token) {
       localStorage.setItem('cadastral_jwt', res.access_token);
+      if (res.user) {
+        localStorage.setItem('cadastral_user', JSON.stringify(res.user));
+      }
       return res;
     }
+
 
     // Mock response fallback for demo workstation
     const mockUser = {
