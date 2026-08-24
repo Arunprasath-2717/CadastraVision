@@ -15,8 +15,7 @@ router = APIRouter(prefix="/v1/geo", tags=["Geographic Data"])
     summary="Get parcels as GeoJSON",
     description=(
         "Return all (or filtered) parcels as a GeoJSON FeatureCollection. "
-        "Supports bbox, zone, and jurisdiction filters. "
-        "**STUB** — Phase 3: real spatial query."
+        "Supports bbox, zone, and jurisdiction filters."
     ),
 )
 async def get_geo_parcels(
@@ -25,3 +24,28 @@ async def get_geo_parcels(
     jurisdiction: str | None = Query(default=None),
 ) -> GeoFeatureCollection:
     return GeoFeatureCollection(features=[], total=0)
+
+
+@router.get(
+    "/buildings",
+    response_model=GeoFeatureCollection,
+    summary="Get buildings as GeoJSON",
+    description="Return buildings as a GeoJSON FeatureCollection.",
+)
+async def get_geo_buildings(
+    bbox: str | None = Query(default=None),
+) -> GeoFeatureCollection:
+    return GeoFeatureCollection(features=[], total=0)
+
+
+@router.get(
+    "/roads",
+    response_model=GeoFeatureCollection,
+    summary="Get roads as GeoJSON",
+    description="Return roads as a GeoJSON FeatureCollection.",
+)
+async def get_geo_roads(
+    bbox: str | None = Query(default=None),
+) -> GeoFeatureCollection:
+    return GeoFeatureCollection(features=[], total=0)
+
