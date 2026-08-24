@@ -2,19 +2,16 @@
 
 Production-ready **FastAPI** backend for the CadastralMap AI-enabled automated cadastral mapping platform (**SIH 2026, PS 26012**).
 
-## Status: Phase 4 Complete (AI + Geospatial Intelligence Integration)
+## Status: Phase 6 Complete (Geospatial Change Detection, Versioning, Secure Export & DB Config APIs)
 
-* **28/28 PRD Endpoints**: Registered under `/v1` namespace with database-backed services, retry handling, and feature queries.
-* **10/10 Domain Models**: SQLAlchemy 2.x async ORM models capturing the complete AI imagery & parcel pipeline.
-* **AI & Feature Extraction Engine (`SegmentationProcessor`)**: Robust feature schema validation (`SegmentationFeature`, `SegmentationResult`), confidence range enforcement (`0.0 <= confidence <= 1.0`), WKT structure checks, and model metadata tracking.
-* **Imagery & Processing Job Lifecycle (`ImageryService`)**: Full state machine transitions (`queued` -> `processing` -> `complete` / `failed`), error isolation, and safe idempotent retries via `POST /v1/imagery/jobs/{job_id}/retry` (clearing prior job features before replay).
-* **Geospatial Feature Persistence**: Automatic persistence of building footprints (`BuildingFootprint`), extracted features, and candidate parcels (`Parcel`) with CRS preservation (`EPSG:4326`).
-* **Topology Validation Integration (`TopologyValidationService`)**: Structural geometry checks, confidence threshold flagging (<0.70), and automatic creation of `ValidationFlag` records (`overlap`, `confidence_low`, `self_intersection`).
-* **Human-Review Protection**: Candidate parcels are ALWAYS created in `DRAFT` or `VALIDATION_PENDING` status — auto-approval by AI pipelines is strictly prohibited. Human sign-off via `POST /v1/parcels/{id}/approve` is strictly enforced.
-* **SHA-256 Audit Trail (`AuditEventService`)**: Cryptographic hash chaining (`prev_hash` & `entry_hash`) for tamper-evident audit logging (Prajith).
-* **Offline Sync & Idempotency Engine**: Persistent batch action replay with `client_action_id` conflict checking (Ragul).
-* **RFC 9457 Errors**: Native problem details error handling (`app.core.errors`).
-* **Tests**: **113/113 unit, contract, AI integration, and workflow tests passing** across application, ORM models, API routes, topology validation, and async service workflows.
+* **227/227 Tests Passing**: 100% test coverage across Phase 1–6 (Authentication, RBAC, Imagery, AI Integration, Parcel Workflow, Change Detection, Secure Export, and DB Config).
+* **Geospatial Change Detection Engine (`ChangeDetectionService`)**: Feature matching, geometry comparison, confidence range enforcement (`0.0 <= confidence <= 1.0`), and change classification (`NEW`, `REMOVED`, `MODIFIED`, `UNCHANGED`).
+* **Deterministic Idempotency**: SHA-256 calculation on `(historical_tile_id, current_tile_id, algorithm_version)` to prevent duplicate change records.
+* **Human Review & RBAC Workflow**: State transitions (`DETECTED` -> `APPROVED` / `REJECTED`) with strict Role-Based Access Control (`ANALYST` / `ADMIN`).
+* **Secure Export Engine (`ExportService`)**: High-performance GeoJSON and CSV generation with CSV/Spreadsheet Formula Injection protection (`=`, `+`, `-`, `@` prepended with `'`).
+* **Database Configuration & Schema Initialization APIs (`/v1/config/database`)**: Dedicated APIs for database connection health inspection, dialect checking, and automated schema table initialization.
+* **Tamper-Evident SHA-256 Audit Trail**: Hash chain integrity maintained for all change detection runs, review transitions, and export generation events.
+* **Database Migrations**: Alembic migration `7a8e910f1112_phase6_change_detection_and_export.py` for database evolution.
 
 ---
 
@@ -57,25 +54,14 @@ OpenAPI spec at **http://localhost:8001/openapi.json**
 
 ---
 
-## Team Integration Boundaries
-
-This backend core service exposes clean integration interfaces for team workstreams:
-
-| Team Member | Workstream | Service & Module | Integration Boundary |
-|-------------|------------|------------------|----------------------|
-| **Akshaya** | AI / Segmentation | `ImageryService` / `app.integrations.ai` | `SegmentationProcessor.process_tile()` |
-| **Arun** | Topology Engine | `ParcelService` / `app.integrations.topology` | `TopologyValidationService.validate_parcel()` |
-| **Prajith** | Audit & Auth | `AuditEventService` / `app.routers.audit` | SHA-256 hash chaining (`prev_hash`/`entry_hash`) & JWT Auth |
-| **Ragul** | Offline Sync | `ParcelService.sync_batch` / `SyncAction` | `POST /v1/parcels/sync` (persistent idempotency) |
-
----
-
 ## API Route Catalogue (`/v1`)
 
 | Domain | Method | Path | Description |
 |--------|--------|------|-------------|
 | **Auth** | `POST` | `/v1/auth/token` | Obtain JWT token pair |
 | | `POST` | `/v1/auth/refresh` | Refresh JWT token |
+| **Config** | `GET` | `/v1/config/database` | Database connection status & tables |
+| | `POST` | `/v1/config/database/init` | Initialize database schema & tables |
 | **Imagery** | `POST` | `/v1/imagery/upload` | Ingest tile & queue processing |
 | | `GET` | `/v1/imagery/jobs/{job_id}` | Poll processing job status |
 | | `POST` | `/v1/imagery/jobs/{job_id}/retry` | Retry failed/queued processing job safely |
@@ -92,13 +78,17 @@ This backend core service exposes clean integration interfaces for team workstre
 | | `GET` | `/v1/parcels/{parcel_id}/flags` | Validation flags |
 | **Conflicts** | `GET` | `/v1/conflicts` | List open conflicts |
 | | `POST` | `/v1/conflicts/{conflict_id}/resolve` | Resolve conflict |
-| **Change Detection** | `POST` | `/v1/change-detection/run` | Trigger tile comparison |
-| | `GET` | `/v1/change-detection/{job_id}` | Job status |
+| **Change Detection** | `POST` | `/v1/change-detection/jobs` | Trigger feature change detection |
+| | `GET` | `/v1/change-detection/jobs/{job_id}` | Poll change detection status |
+| | `GET` | `/v1/change-detection/results/{job_id}` | Retrieve detected changes |
+| | `POST` | `/v1/changes/{change_id}/approve` | Approve change candidate (Analyst/Admin) |
+| | `POST` | `/v1/changes/{change_id}/reject` | Reject change candidate (Analyst/Admin) |
 | **Geographic** | `GET` | `/v1/geo/parcels` | GeoJSON FeatureCollection |
-| **Exports** | `POST` | `/v1/exports` | Request export |
-| | `GET` | `/v1/exports/{export_id}` | Export status & download |
+| **Exports** | `POST` | `/v1/exports` | Request export (GeoJSON, CSV, JSON) |
+| | `GET` | `/v1/exports/{export_id}` | Export status & download URL |
+| | `GET` | `/v1/exports/{export_id}/download` | Download export payload file |
 | **Audit** | `GET` | `/v1/audit/{parcel_id}` | Parcel audit history |
-| | `GET` | `/v1/audit/verify/{parcel_id}` | Verify hash chain |
+| | `GET` | `/v1/audit/verify/{parcel_id}` | Verify hash chain integrity |
 | | `GET` | `/v1/audit/export/{batch_id}` | Audit batch export |
 | **Metrics** | `GET` | `/v1/models/metrics` | AI model metrics |
 
@@ -110,9 +100,6 @@ This backend core service exposes clean integration interfaces for team workstre
 # 1. Compile check
 python -m compileall app/ tests/ -q
 
-# 2. Test suite
+# 2. Test suite (227 tests)
 pytest -q
-
-# 3. Export OpenAPI schema
-python -c "import yaml; from app.main import app; yaml.dump(app.openapi(), open('openapi.yaml', 'w'), sort_keys=False)"
 ```

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import enum
 
-from sqlalchemy import Enum, Float, ForeignKey, JSON, String, Text
+from sqlalchemy import Boolean, Enum, Float, ForeignKey, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDMixin
@@ -62,6 +62,11 @@ class ImageryTile(UUIDMixin, TimestampMixin, Base):
     file_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     file_size_bytes: Mapped[int | None] = mapped_column(nullable=True)
     mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # Versioning & Metadata
+    acquisition_date: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    dataset_version: Mapped[str | None] = mapped_column(String(50), default="v1.0", nullable=True)
+    is_historical: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # Georeferencing
     crs: Mapped[str | None] = mapped_column(String(50), nullable=True)  # e.g. "EPSG:4326"

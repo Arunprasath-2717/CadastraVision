@@ -31,6 +31,10 @@ class AuditAction(str, enum.Enum):
     VIEW = "view"
     LOGIN = "login"
     LOGOUT = "logout"
+    CHANGE_DETECTED = "change_detected"
+    CHANGE_APPROVED = "change_approved"
+    CHANGE_REJECTED = "change_rejected"
+    EXPORT_GENERATED = "export_generated"
 
 
 class AuditLogEntry(UUIDMixin, TimestampMixin, Base):

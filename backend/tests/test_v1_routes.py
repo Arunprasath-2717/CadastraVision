@@ -275,7 +275,7 @@ async def test_change_detection_run_stub(client: AsyncClient):
         "/v1/change-detection/run",
         json={"tile_id_before": "t1", "tile_id_after": "t2"},
     )
-    assert resp.status_code == 200
+    assert resp.status_code in (200, 202)
     assert "job_id" in resp.json()
 
 

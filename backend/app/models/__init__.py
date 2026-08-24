@@ -26,6 +26,7 @@ from app.models.parcel import (  # noqa: F401
 
 # FK layer 3 — depends on ImageryTile + ProcessingJob + Parcel
 from app.models.feature import BuildingFootprint, FeatureType  # noqa: F401
+from app.models.change import ChangeRecord, ChangeType, ChangeStatus  # noqa: F401
 
 # FK layer 3 — depends on Parcel
 from app.models.validation import ValidationFlag, FlagType, FlagSeverity  # noqa: F401
@@ -43,6 +44,7 @@ __all__ = [
     "ProcessingJob", "JobType", "JobStatus",
     "Parcel", "ParcelWorkflowStatus", "ALLOWED_TRANSITIONS",
     "BuildingFootprint", "FeatureType",
+    "ChangeRecord", "ChangeType", "ChangeStatus",
     "ValidationFlag", "FlagType", "FlagSeverity",
     "SyncAction", "SyncActionStatus",
     "AuditLogEntry", "AuditAction",

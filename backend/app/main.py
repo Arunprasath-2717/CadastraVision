@@ -89,6 +89,7 @@ def create_app() -> FastAPI:
     from app.routers.exports import router as exports_router
     from app.routers.audit import router as audit_router
     from app.routers.metrics import router as metrics_router
+    from app.routers.config import router as config_router
 
     for r in (
         auth_router,
@@ -102,6 +103,7 @@ def create_app() -> FastAPI:
         exports_router,
         audit_router,
         metrics_router,
+        config_router,
     ):
         app.include_router(r)
 

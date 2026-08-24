@@ -124,8 +124,10 @@ class PermissionError(CadastraVisionError):  # noqa: A001
     type_slug = "forbidden"
 
 
-# Alias for clarity
+# Aliases for clarity
 AuthorizationError = PermissionError
+ResourceNotFoundError = NotFoundError
+ValidationError = UnprocessableError
 
 
 class BadRequestError(CadastraVisionError):
