@@ -16,6 +16,7 @@ Handles:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import datetime, timezone
 
@@ -38,7 +39,7 @@ from app.models.imagery import (
     TileStatus,
 )
 from app.models.parcel import Parcel, ParcelWorkflowStatus
-from app.models.validation import ValidationFlag
+from app.models.validation import FlagSeverity, FlagType, ValidationFlag
 
 logger = logging.getLogger(__name__)
 
@@ -156,15 +157,21 @@ class ImageryService:
                     self.db.add(parcel)
                     await self.db.flush()
 
-                    # Run Topology Validation Service
-                    val_res = await self.topology_service.validate_parcel(
-                        parcel_id=parcel.id,
-                        geometry_wkt=feature.geometry_wkt,
-                        confidence=feature.confidence,
-                    )
+                    # Run Topology Validation Service safely
+                    try:
+                        val_res = await self.topology_service.validate_parcel(
+                            parcel_id=parcel.id,
+                            geometry_wkt=feature.geometry_wkt,
+                            confidence=feature.confidence,
+                        )
+                    except Exception as top_exc:
+                        logger.warning(
+                            "Topology validation failed for parcel=%s: %s", parcel.id, top_exc
+                        )
+                        val_res = None
 
                     # Persist any validation flags
-                    if val_res.flags:
+                    if val_res and val_res.flags:
                         parcel.workflow_status = ParcelWorkflowStatus.VALIDATION_PENDING
                         for flag_detail in val_res.flags:
                             flag_record = ValidationFlag(
@@ -174,8 +181,19 @@ class ImageryService:
                                 description=flag_detail.description,
                             )
                             self.db.add(flag_record)
-                    else:
+                    elif val_res and val_res.is_valid:
                         parcel.workflow_status = ParcelWorkflowStatus.VALIDATED
+                    else:
+                        # Topology failed safely — create warning flag
+                        parcel.workflow_status = ParcelWorkflowStatus.VALIDATION_PENDING
+                        self.db.add(
+                            ValidationFlag(
+                                parcel_id=parcel.id,
+                                flag_type=FlagType.OTHER,
+                                severity=FlagSeverity.WARNING,
+                                description="Topology validation service encountered an unexpected error",
+                            )
+                        )
 
                     created_parcels_count += 1
                 else:
@@ -213,7 +231,7 @@ class ImageryService:
                 created_features_count,
             )
 
-        except Exception as exc:
+        except (Exception, asyncio.TimeoutError) as exc:
             logger.exception("AI processing failed for job=%s: %s", job.id, exc)
             job.status = JobStatus.FAILED
             job.error_message = f"AI processing error: {str(exc)}"
