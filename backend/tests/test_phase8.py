@@ -223,11 +223,13 @@ async def test_14_s3_storage_provider_template():
 # =====================================================================
 
 def test_17_dockerfile_exists_and_uses_non_root():
-    assert os.path.exists("Dockerfile")
-    with open("Dockerfile", "r") as f:
+    dockerfile_path = "Dockerfile" if os.path.exists("Dockerfile") else "backend/Dockerfile"
+    assert os.path.exists(dockerfile_path)
+    with open(dockerfile_path, "r") as f:
         content = f.read()
     assert "USER appuser" in content
     assert "HEALTHCHECK" in content
+
 
 
 @pytest.mark.anyio
