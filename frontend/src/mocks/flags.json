@@ -1,0 +1,55 @@
+{
+  "P-1024": [
+    {
+      "id": "FLG-8801",
+      "parcel_id": "P-1024",
+      "flag_type": "overlap",
+      "severity": "high",
+      "description": "Boundary overlaps adjacent municipal road buffer by 1.8m",
+      "resolved_by": null,
+      "resolved_at": null
+    }
+  ],
+  "P-1025": [
+    {
+      "id": "FLG-8802",
+      "parcel_id": "P-1025",
+      "flag_type": "low_confidence",
+      "severity": "high",
+      "description": "Tree canopy obstruction reduced boundary confidence below threshold",
+      "resolved_by": null,
+      "resolved_at": null
+    },
+    {
+      "id": "FLG-8803",
+      "parcel_id": "P-1025",
+      "flag_type": "gap",
+      "severity": "medium",
+      "description": "Unmapped gap of 0.9m between P-1025 and P-1024",
+      "resolved_by": null,
+      "resolved_at": null
+    }
+  ],
+  "P-1027": [
+    {
+      "id": "FLG-8804",
+      "parcel_id": "P-1027",
+      "flag_type": "self_intersection",
+      "severity": "high",
+      "description": "Polygon boundary vertex cross-intersects on NW corner",
+      "resolved_by": null,
+      "resolved_at": null
+    }
+  ],
+  "P-1028": [
+    {
+      "id": "FLG-8805",
+      "parcel_id": "P-1028",
+      "flag_type": "boundary_discrepancy",
+      "severity": "high",
+      "description": "Feature misidentified water drainage ditch as parcel boundary",
+      "resolved_by": "Ramesh K.",
+      "resolved_at": "2026-08-24T07:20:00+05:30"
+    }
+  ]
+}

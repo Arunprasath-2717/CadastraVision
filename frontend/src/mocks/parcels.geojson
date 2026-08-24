@@ -1,0 +1,240 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "P-1001",
+      "properties": {
+        "id": "P-1001",
+        "zone": "Sector 4-B",
+        "jurisdiction": "Bengaluru East Municipal Corp",
+        "source": "AI-generated",
+        "confidence_score": 0.94,
+        "confidence_band": "HIGH",
+        "validation_status": "validated",
+        "linked_buildings": ["B-101", "B-102"],
+        "area_sqm": 420.5,
+        "last_updated": "2026-08-24T09:30:00+05:30",
+        "updated_by": "System AI (SAMGeo-v2)",
+        "flags": []
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [77.5920, 12.9710],
+            [77.5935, 12.9710],
+            [77.5935, 12.9722],
+            [77.5920, 12.9722],
+            [77.5920, 12.9710]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "P-1024",
+      "properties": {
+        "id": "P-1024",
+        "zone": "Sector 4-B",
+        "jurisdiction": "Bengaluru East Municipal Corp",
+        "source": "AI-generated",
+        "confidence_score": 0.62,
+        "confidence_band": "MEDIUM",
+        "validation_status": "needs_review",
+        "linked_buildings": ["B-103"],
+        "area_sqm": 580.2,
+        "last_updated": "2026-08-24T10:15:00+05:30",
+        "updated_by": "System AI (YOLOv8-seg)",
+        "flags": [
+          {
+            "id": "FLG-8801",
+            "parcel_id": "P-1024",
+            "flag_type": "overlap",
+            "severity": "high",
+            "description": "Boundary overlaps adjacent municipal road buffer by 1.8m",
+            "resolved_by": null,
+            "resolved_at": null
+          }
+        ],
+        "gis_conflict": {
+          "conflict_id": "CONF-902",
+          "existing_gis_area_sqm": 565.0,
+          "discrepancy_sqm": 15.2,
+          "description": "Recorded 2018 Survey boundary differs from AI drone segmentation on eastern edge."
+        }
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [77.5938, 12.9710],
+            [77.5955, 12.9710],
+            [77.5955, 12.9723],
+            [77.5938, 12.9723],
+            [77.5938, 12.9710]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "P-1025",
+      "properties": {
+        "id": "P-1025",
+        "zone": "Sector 4-C",
+        "jurisdiction": "Bengaluru East Municipal Corp",
+        "source": "AI-generated",
+        "confidence_score": 0.42,
+        "confidence_band": "LOW",
+        "validation_status": "needs_review",
+        "linked_buildings": [],
+        "area_sqm": 310.8,
+        "last_updated": "2026-08-24T08:45:00+05:30",
+        "updated_by": "System AI (SAMGeo-v2)",
+        "flags": [
+          {
+            "id": "FLG-8802",
+            "parcel_id": "P-1025",
+            "flag_type": "low_confidence",
+            "severity": "high",
+            "description": "Tree canopy obstruction reduced boundary confidence below threshold",
+            "resolved_by": null,
+            "resolved_at": null
+          },
+          {
+            "id": "FLG-8803",
+            "parcel_id": "P-1025",
+            "flag_type": "gap",
+            "severity": "medium",
+            "description": "Unmapped gap of 0.9m between P-1025 and P-1024",
+            "resolved_by": null,
+            "resolved_at": null
+          }
+        ]
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [77.5958, 12.9710],
+            [77.5972, 12.9710],
+            [77.5972, 12.9721],
+            [77.5958, 12.9721],
+            [77.5958, 12.9710]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "P-1026",
+      "properties": {
+        "id": "P-1026",
+        "zone": "Sector 4-C",
+        "jurisdiction": "Bengaluru East Municipal Corp",
+        "source": "human-edited",
+        "confidence_score": 0.98,
+        "confidence_band": "HIGH",
+        "validation_status": "approved",
+        "linked_buildings": ["B-104", "B-105"],
+        "area_sqm": 750.0,
+        "last_updated": "2026-08-24T11:00:00+05:30",
+        "updated_by": "Muthulakshmi (Surveyor ID #4092)",
+        "flags": []
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [77.5920, 12.9726],
+            [77.5940, 12.9726],
+            [77.5940, 12.9740],
+            [77.5920, 12.9740],
+            [77.5920, 12.9726]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "P-1027",
+      "properties": {
+        "id": "P-1027",
+        "zone": "Sector 4-C",
+        "jurisdiction": "Bengaluru East Municipal Corp",
+        "source": "AI-generated",
+        "confidence_score": 0.55,
+        "confidence_band": "MEDIUM",
+        "validation_status": "needs_review",
+        "linked_buildings": ["B-106"],
+        "area_sqm": 490.4,
+        "last_updated": "2026-08-24T09:12:00+05:30",
+        "updated_by": "System AI (YOLOv8-seg)",
+        "flags": [
+          {
+            "id": "FLG-8804",
+            "parcel_id": "P-1027",
+            "flag_type": "self_intersection",
+            "severity": "high",
+            "description": "Polygon boundary vertex cross-intersects on NW corner",
+            "resolved_by": null,
+            "resolved_at": null
+          }
+        ]
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [77.5944, 12.9726],
+            [77.5960, 12.9726],
+            [77.5960, 12.9740],
+            [77.5944, 12.9738],
+            [77.5944, 12.9726]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "P-1028",
+      "properties": {
+        "id": "P-1028",
+        "zone": "Sector 4-D",
+        "jurisdiction": "Bengaluru East Municipal Corp",
+        "source": "AI-generated",
+        "confidence_score": 0.38,
+        "confidence_band": "LOW",
+        "validation_status": "rejected",
+        "linked_buildings": [],
+        "area_sqm": 220.1,
+        "last_updated": "2026-08-24T07:20:00+05:30",
+        "updated_by": "Ramesh K. (Sr. Surveyor)",
+        "flags": [
+          {
+            "id": "FLG-8805",
+            "parcel_id": "P-1028",
+            "flag_type": "boundary_discrepancy",
+            "severity": "high",
+            "description": "Feature misidentified water drainage ditch as parcel boundary",
+            "resolved_by": "Ramesh K.",
+            "resolved_at": "2026-08-24T07:20:00+05:30"
+          }
+        ]
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [77.5964, 12.9726],
+            [77.5978, 12.9726],
+            [77.5978, 12.9740],
+            [77.5964, 12.9740],
+            [77.5964, 12.9726]
+          ]
+        ]
+      }
+    }
+  ]
+}

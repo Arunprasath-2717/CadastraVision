@@ -1,0 +1,97 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "B-101",
+      "properties": {
+        "id": "B-101",
+        "parcel_id": "P-1001",
+        "building_type": "Residential 2-Storey",
+        "height_m": 8.5,
+        "confidence_score": 0.95
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [77.5923, 12.9712],
+            [77.5930, 12.9712],
+            [77.5930, 12.9717],
+            [77.5923, 12.9717],
+            [77.5923, 12.9712]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "B-102",
+      "properties": {
+        "id": "B-102",
+        "parcel_id": "P-1001",
+        "building_type": "Outhouse Shed",
+        "height_m": 3.2,
+        "confidence_score": 0.89
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [77.5931, 12.9718],
+            [77.5934, 12.9718],
+            [77.5934, 12.9720],
+            [77.5931, 12.9720],
+            [77.5931, 12.9718]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "B-103",
+      "properties": {
+        "id": "B-103",
+        "parcel_id": "P-1024",
+        "building_type": "Commercial Complex",
+        "height_m": 14.0,
+        "confidence_score": 0.82
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [77.5942, 12.9713],
+            [77.5951, 12.9713],
+            [77.5951, 12.9720],
+            [77.5942, 12.9720],
+            [77.5942, 12.9713]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "B-104",
+      "properties": {
+        "id": "B-104",
+        "parcel_id": "P-1026",
+        "building_type": "Government Annex",
+        "height_m": 11.0,
+        "confidence_score": 0.98
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [77.5924, 12.9729],
+            [77.5935, 12.9729],
+            [77.5935, 12.9736],
+            [77.5924, 12.9736],
+            [77.5924, 12.9729]
+          ]
+        ]
+      }
+    }
+  ]
+}
