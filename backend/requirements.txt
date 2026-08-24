@@ -1,0 +1,23 @@
+# ── Core Framework ──────────────────────────────────────────────────────────
+fastapi==0.115.14
+uvicorn[standard]==0.35.0
+
+# ── Pydantic / Settings ──────────────────────────────────────────────────────
+pydantic==2.13.4
+pydantic-settings==2.10.1
+
+# ── Database ─────────────────────────────────────────────────────────────────
+sqlalchemy==2.0.41
+aiosqlite==0.21.0
+alembic==1.16.4
+# Required by SQLAlchemy async on Python 3.14 (not bundled on linux/aarch64)
+greenlet==3.5.5
+
+# ── HTTP / Auth ───────────────────────────────────────────────────────────────
+httpx==0.28.1
+python-multipart==0.0.20
+
+# ── Testing ───────────────────────────────────────────────────────────────────
+pytest==8.4.1
+pytest-asyncio==0.26.0
+anyio==4.9.0

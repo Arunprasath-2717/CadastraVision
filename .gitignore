@@ -1,0 +1,21 @@
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# Environment Secrets
+.env
+*.env
+
+# Python Bytecode
+__pycache__/
+*.py[cod]
+
+# Database files
+*.db
+*.sqlite3
+
+# Test & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
