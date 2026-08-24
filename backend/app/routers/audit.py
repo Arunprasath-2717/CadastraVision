@@ -11,15 +11,21 @@ to prevent FastAPI from matching them as parcel IDs.
 
 from __future__ import annotations
 
+import logging
+from typing import Annotated
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.security import get_current_user, require_role
 from app.models.audit import AuditLogEntry
+from app.models.user import User, UserRole
 from app.schemas.audit import AuditEntryResponse, AuditExportResponse, AuditTrailResponse, AuditVerifyResponse
 from app.services.audit_service import GENESIS_HASH, compute_entry_hash
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/audit", tags=["Audit"])
 
 
@@ -30,7 +36,9 @@ router = APIRouter(prefix="/v1/audit", tags=["Audit"])
     description="Verify the SHA-256 hash-chain integrity for a parcel's audit trail.",
 )
 async def verify_audit_chain(
-    parcel_id: str, db: AsyncSession = Depends(get_db)
+    parcel_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> AuditVerifyResponse:
     stmt = (
         select(AuditLogEntry)
@@ -85,7 +93,9 @@ async def verify_audit_chain(
     description="Export a batch of audit log entries.",
 )
 async def export_audit_batch(
-    batch_id: str, db: AsyncSession = Depends(get_db)
+    batch_id: str,
+    current_user: User = Depends(require_role(UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
 ) -> AuditExportResponse:
     stmt = select(AuditLogEntry).limit(100)
     entries = list((await db.execute(stmt)).scalars().all())
@@ -99,7 +109,9 @@ async def export_audit_batch(
     description="Retrieve the complete audit trail for a parcel.",
 )
 async def get_parcel_audit(
-    parcel_id: str, db: AsyncSession = Depends(get_db)
+    parcel_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> AuditTrailResponse:
     stmt = (
         select(AuditLogEntry)

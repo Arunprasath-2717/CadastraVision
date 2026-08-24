@@ -14,11 +14,15 @@ to avoid FastAPI matching "sync" as a parcel_id path parameter.
 
 from __future__ import annotations
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.security import get_current_user, require_role
 from app.models.parcel import ParcelWorkflowStatus
+from app.models.user import User, UserRole
 from app.schemas.common import PaginatedResponse
 from app.schemas.parcel import (
     ApproveRequest,
@@ -47,7 +51,9 @@ router = APIRouter(prefix="/v1/parcels", tags=["Parcels"])
     ),
 )
 async def sync_parcels(
-    body: SyncRequest, db: AsyncSession = Depends(get_db)
+    body: SyncRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: AsyncSession = Depends(get_db),
 ) -> SyncResponse:
     service = ParcelService(db)
     return await service.sync_batch(body.actions)
@@ -70,6 +76,7 @@ async def list_parcels(
     validation_status: ParcelWorkflowStatus | None = Query(default=None),
     confidence_min: float | None = Query(default=None, ge=0.0, le=1.0),
     confidence_max: float | None = Query(default=None, ge=0.0, le=1.0),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> PaginatedResponse[ParcelSummary]:
     service = ParcelService(db)
@@ -92,7 +99,9 @@ async def list_parcels(
     description="Retrieve full parcel representation including geometry.",
 )
 async def get_parcel(
-    parcel_id: str, db: AsyncSession = Depends(get_db)
+    parcel_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> ParcelDetail:
     service = ParcelService(db)
     p = await service.get_parcel(parcel_id)
@@ -125,6 +134,7 @@ async def get_parcel(
 async def edit_parcel(
     parcel_id: str,
     body: ParcelEditRequest,
+    current_user: User = Depends(require_role(UserRole.ANALYST, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> ParcelEditResponse:
     service = ParcelService(db)
@@ -150,10 +160,11 @@ async def edit_parcel(
 async def approve_parcel(
     parcel_id: str,
     body: ApproveRequest,
+    current_user: User = Depends(require_role(UserRole.ANALYST, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> ParcelActionResponse:
     service = ParcelService(db)
-    p = await service.approve(parcel_id, notes=body.notes)
+    p = await service.approve(parcel_id, notes=body.notes, reviewer_id=current_user.id)
     return ParcelActionResponse(
         parcel_id=p.id,
         workflow_status=p.workflow_status,
@@ -171,10 +182,11 @@ async def approve_parcel(
 async def reject_parcel(
     parcel_id: str,
     body: RejectRequest,
+    current_user: User = Depends(require_role(UserRole.ANALYST, UserRole.ADMIN)),
     db: AsyncSession = Depends(get_db),
 ) -> ParcelActionResponse:
     service = ParcelService(db)
-    p = await service.reject(parcel_id, reason=body.reason)
+    p = await service.reject(parcel_id, reason=body.reason, reviewer_id=current_user.id)
     return ParcelActionResponse(
         parcel_id=p.id,
         workflow_status=p.workflow_status,

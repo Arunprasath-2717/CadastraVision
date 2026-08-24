@@ -86,7 +86,7 @@ async def test_openapi_v1_prefix(client: AsyncClient):
 
 @pytest.mark.anyio
 async def test_auth_token_stub(client: AsyncClient):
-    resp = await client.post("/v1/auth/token", json={"username": "u@test.com", "password": "x"})
+    resp = await client.post("/v1/auth/token", json={"username": "test_admin@cadastravision.org", "password": "AdminPass123!"})
     assert resp.status_code == 200
     body = resp.json()
     assert "access_token" in body
@@ -95,7 +95,9 @@ async def test_auth_token_stub(client: AsyncClient):
 
 @pytest.mark.anyio
 async def test_auth_refresh_stub(client: AsyncClient):
-    resp = await client.post("/v1/auth/refresh", json={"refresh_token": "tok"})
+    login_resp = await client.post("/v1/auth/token", json={"username": "test_admin@cadastravision.org", "password": "AdminPass123!"})
+    refresh_tok = login_resp.json()["refresh_token"]
+    resp = await client.post("/v1/auth/refresh", json={"refresh_token": refresh_tok})
     assert resp.status_code == 200
     assert "access_token" in resp.json()
 

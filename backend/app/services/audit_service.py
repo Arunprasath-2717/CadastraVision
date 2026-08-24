@@ -112,3 +112,26 @@ class AuditEventService:
             action, entity_type, entity_id, entry_hash[:12]
         )
         return entry
+
+    async def record_entry(
+        self,
+        *,
+        user_id: str | None = None,
+        entity_type: str,
+        entity_id: str,
+        action: AuditAction,
+        diff: dict[str, Any] | None = None,
+        ip_address: str | None = None,
+    ) -> AuditLogEntry:
+        """Alias for record() for API consistency."""
+        return await self.record(
+            entity_type=entity_type,
+            entity_id=entity_id,
+            action=action,
+            user_id=user_id,
+            diff=diff,
+            ip_address=ip_address,
+        )
+
+
+AuditService = AuditEventService

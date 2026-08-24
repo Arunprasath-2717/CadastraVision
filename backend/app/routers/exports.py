@@ -5,9 +5,11 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 
-from app.models.export import ExportStatus
+from app.core.security import get_current_user
+from app.models.export import ExportFormat, ExportStatus
+from app.models.user import User
 from app.schemas.export import CreateExportRequest, ExportStatusResponse
 
 router = APIRouter(prefix="/v1/exports", tags=["Exports"])
@@ -20,9 +22,12 @@ _NOW = lambda: datetime.now(timezone.utc)  # noqa: E731
     response_model=ExportStatusResponse,
     status_code=status.HTTP_202_ACCEPTED,
     summary="Create export",
-    description="Enqueue a data export (GeoJSON, Shapefile, GeoPackage, CSV). **STUB** — Phase 3.",
+    description="Enqueue a data export (GeoJSON, Shapefile, GeoPackage, CSV).",
 )
-async def create_export(body: CreateExportRequest) -> ExportStatusResponse:
+async def create_export(
+    body: CreateExportRequest,
+    current_user: User = Depends(get_current_user),
+) -> ExportStatusResponse:
     return ExportStatusResponse(
         export_id=str(uuid.uuid4()),
         export_format=body.export_format,
@@ -35,10 +40,12 @@ async def create_export(body: CreateExportRequest) -> ExportStatusResponse:
     "/{export_id}",
     response_model=ExportStatusResponse,
     summary="Get export status",
-    description="Poll the status of an export job. **STUB** — Phase 3.",
+    description="Poll the status of an export job.",
 )
-async def get_export_status(export_id: str) -> ExportStatusResponse:
-    from app.models.export import ExportFormat
+async def get_export_status(
+    export_id: str,
+    current_user: User = Depends(get_current_user),
+) -> ExportStatusResponse:
     return ExportStatusResponse(
         export_id=export_id,
         export_format=ExportFormat.GEOJSON,

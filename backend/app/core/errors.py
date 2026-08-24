@@ -124,6 +124,10 @@ class PermissionError(CadastraVisionError):  # noqa: A001
     type_slug = "forbidden"
 
 
+# Alias for clarity
+AuthorizationError = PermissionError
+
+
 class BadRequestError(CadastraVisionError):
     """Malformed request — 400."""
     status_code = status.HTTP_400_BAD_REQUEST

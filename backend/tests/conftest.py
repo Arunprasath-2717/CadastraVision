@@ -69,8 +69,48 @@ async def client(db_session: AsyncSession):
     """
     Return an ``httpx.AsyncClient`` backed by the test app.
 
-    The ``get_db`` dependency is overridden to use the isolated test session.
+    Overriding ``get_db`` and ``get_current_user`` so Phase 1-4 regression tests pass with an admin identity.
     """
+    from app.core.security import get_current_user, hash_password
+    from app.models.user import User, UserRole
+    from sqlalchemy import select
+
+    # Ensure default test admin user exists in db
+    stmt = select(User).where(User.email == "test_admin@cadastravision.org")
+    admin_user = (await db_session.execute(stmt)).scalars().first()
+    if not admin_user:
+        admin_user = User(
+            id="test-admin-uuid-1234",
+            email="test_admin@cadastravision.org",
+            hashed_password=hash_password("AdminPass123!"),
+            full_name="Test Admin",
+            role=UserRole.ADMIN,
+            is_active=True,
+        )
+        db_session.add(admin_user)
+        await db_session.flush()
+
+    app = create_app()
+
+    async def override_get_db():
+        yield db_session
+
+    async def override_get_current_user():
+        return admin_user
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as ac:
+        yield ac
+
+
+@pytest_asyncio.fixture
+async def unauth_client(db_session: AsyncSession):
+    """Client with NO authentication overrides (tests real auth/401/403 logic)."""
     app = create_app()
 
     async def override_get_db():
@@ -83,3 +123,4 @@ async def client(db_session: AsyncSession):
         base_url="http://testserver",
     ) as ac:
         yield ac
+

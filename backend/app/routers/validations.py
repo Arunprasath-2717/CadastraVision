@@ -15,8 +15,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.security import get_current_user, require_role
 from app.integrations.topology.validator import TopologyValidationService
 from app.models.parcel import Parcel, ParcelWorkflowStatus
+from app.models.user import User, UserRole
 from app.models.validation import ValidationFlag
 from app.schemas.validation import (
     FlagResponse,
@@ -40,9 +42,9 @@ validations_router = APIRouter(prefix="/v1/validations")
     description="List parcels awaiting topology or confidence validation.",
 )
 async def get_validation_queue(
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ValidationQueueResponse:
-    # Query parcels in VALIDATION_PENDING or DRAFT status
     stmt = (
         select(Parcel)
         .where(
@@ -81,7 +83,9 @@ async def get_validation_queue(
     description="Trigger topology and confidence validation for a set of parcels.",
 )
 async def run_validation(
-    body: ValidationRunRequest, db: AsyncSession = Depends(get_db)
+    body: ValidationRunRequest,
+    current_user: User = Depends(require_role(UserRole.ANALYST, UserRole.ADMIN)),
+    db: AsyncSession = Depends(get_db),
 ) -> ValidationRunResponse:
     topology_service = TopologyValidationService()
     job_id = str(uuid.uuid4())
@@ -127,7 +131,9 @@ flags_router = APIRouter(prefix="/v1/parcels")
     tags=["Validation"],
 )
 async def get_parcel_flags(
-    parcel_id: str, db: AsyncSession = Depends(get_db)
+    parcel_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> ParcelFlagsResponse:
     stmt = select(ValidationFlag).where(ValidationFlag.parcel_id == parcel_id)
     res = await db.execute(stmt)

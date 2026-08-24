@@ -106,6 +106,24 @@ def create_app() -> FastAPI:
         app.include_router(r)
 
     logger.debug("All routers registered.")
+
+    def custom_openapi():
+        if app.openapi_schema:
+            return app.openapi_schema
+        openapi_schema = FastAPI.openapi(app)
+        openapi_schema["components"] = openapi_schema.get("components", {})
+        openapi_schema["components"]["securitySchemes"] = {
+            "HTTPBearer": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "description": "Enter JWT access token to authenticate requests.",
+            }
+        }
+        app.openapi_schema = openapi_schema
+        return app.openapi_schema
+
+    app.openapi = custom_openapi
     return app
 
 
