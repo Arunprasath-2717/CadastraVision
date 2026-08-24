@@ -3,6 +3,7 @@ app/routers/imagery.py
 ───────────────────────
 POST /v1/imagery/upload
 GET  /v1/imagery/jobs/{job_id}
+POST /v1/imagery/jobs/{job_id}/retry
 GET  /v1/imagery/tiles/{tile_id}
 GET  /v1/imagery/tiles/{tile_id}/features
 """
@@ -71,7 +72,7 @@ async def upload_imagery(
         tile_id=tile.id,
         job_id=job.id,
         status=job.status,
-        message="Imagery accepted. Processing initiated.",
+        message="Imagery accepted. AI processing initiated.",
     )
 
 
@@ -86,6 +87,32 @@ async def get_job_status(
 ) -> JobStatusResponse:
     service = ImageryService(db)
     job = await service.get_job(job_id)
+    return JobStatusResponse(
+        job_id=job.id,
+        tile_id=job.tile_id,
+        job_type=job.job_type,
+        status=job.status,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+        error_message=job.error_message,
+        result_summary=job.result_json,
+    )
+
+
+@router.post(
+    "/jobs/{job_id}/retry",
+    response_model=JobStatusResponse,
+    summary="Retry a processing job",
+    description="Safely retry a failed or queued imagery processing job. Idempotent.",
+)
+async def retry_job(
+    job_id: str, db: AsyncSession = Depends(get_db)
+) -> JobStatusResponse:
+    service = ImageryService(db)
+    job = await service.retry_job(job_id)
+    await db.commit()
+    await db.refresh(job)
     return JobStatusResponse(
         job_id=job.id,
         tile_id=job.tile_id,

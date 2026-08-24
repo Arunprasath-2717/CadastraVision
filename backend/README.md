@@ -2,16 +2,19 @@
 
 Production-ready **FastAPI** backend for the CadastralMap AI-enabled automated cadastral mapping platform (**SIH 2026, PS 26012**).
 
-## Status: Phase 3 Complete (Core Workflows Implemented)
+## Status: Phase 4 Complete (AI + Geospatial Intelligence Integration)
 
-* **26/26 PRD Endpoints**: Registered under `/v1` namespace with database-backed services.
+* **28/28 PRD Endpoints**: Registered under `/v1` namespace with database-backed services, retry handling, and feature queries.
 * **10/10 Domain Models**: SQLAlchemy 2.x async ORM models capturing the complete AI imagery & parcel pipeline.
-* **Imagery & AI Pipeline Service (`ImageryService`)**: File ingestion, GeoTIFF validation, tile creation, and AI segmentation job dispatch hook (Akshaya).
-* **Parcel Workflow & Topology Engine (`ParcelService`)**: Parcel CRUD, geometric edit processing, topology validation execution (Arun), and state machine lifecycle (`draft` -> `validation_pending` -> `validated` -> `approved` / `rejected`).
+* **AI & Feature Extraction Engine (`SegmentationProcessor`)**: Robust feature schema validation (`SegmentationFeature`, `SegmentationResult`), confidence range enforcement (`0.0 <= confidence <= 1.0`), WKT structure checks, and model metadata tracking.
+* **Imagery & Processing Job Lifecycle (`ImageryService`)**: Full state machine transitions (`queued` -> `processing` -> `complete` / `failed`), error isolation, and safe idempotent retries via `POST /v1/imagery/jobs/{job_id}/retry` (clearing prior job features before replay).
+* **Geospatial Feature Persistence**: Automatic persistence of building footprints (`BuildingFootprint`), extracted features, and candidate parcels (`Parcel`) with CRS preservation (`EPSG:4326`).
+* **Topology Validation Integration (`TopologyValidationService`)**: Structural geometry checks, confidence threshold flagging (<0.70), and automatic creation of `ValidationFlag` records (`overlap`, `confidence_low`, `self_intersection`).
+* **Human-Review Protection**: Candidate parcels are ALWAYS created in `DRAFT` or `VALIDATION_PENDING` status — auto-approval by AI pipelines is strictly prohibited. Human sign-off via `POST /v1/parcels/{id}/approve` is strictly enforced.
 * **SHA-256 Audit Trail (`AuditEventService`)**: Cryptographic hash chaining (`prev_hash` & `entry_hash`) for tamper-evident audit logging (Prajith).
 * **Offline Sync & Idempotency Engine**: Persistent batch action replay with `client_action_id` conflict checking (Ragul).
 * **RFC 9457 Errors**: Native problem details error handling (`app.core.errors`).
-* **Tests**: 106/106 unit, contract, and workflow tests passing across application, ORM models, API routes, and async service workflows.
+* **Tests**: **113/113 unit, contract, AI integration, and workflow tests passing** across application, ORM models, API routes, topology validation, and async service workflows.
 
 ---
 
@@ -75,6 +78,7 @@ This backend core service exposes clean integration interfaces for team workstre
 | | `POST` | `/v1/auth/refresh` | Refresh JWT token |
 | **Imagery** | `POST` | `/v1/imagery/upload` | Ingest tile & queue processing |
 | | `GET` | `/v1/imagery/jobs/{job_id}` | Poll processing job status |
+| | `POST` | `/v1/imagery/jobs/{job_id}/retry` | Retry failed/queued processing job safely |
 | | `GET` | `/v1/imagery/tiles/{tile_id}` | Tile metadata |
 | | `GET` | `/v1/imagery/tiles/{tile_id}/features` | AI-extracted features |
 | **Parcels** | `GET` | `/v1/parcels` | List parcels (cursor-paginated) |

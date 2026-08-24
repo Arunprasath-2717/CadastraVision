@@ -87,9 +87,7 @@ paths:
       - Imagery
       summary: Upload imagery tile
       description: "Upload a satellite or drone imagery tile for AI processing. Returns\
-        \ tile_id and job_id immediately \u2014 processing is async. **PRD**: tile_id\
-        \ returned within 5 seconds for files < 500 MB. **STUB** \u2014 real file\
-        \ persistence + AI hook (Akshaya): Phase 3."
+        \ tile_id and job_id immediately \u2014 processing is dispatched."
       operationId: upload_imagery_v1_imagery_upload_post
       requestBody:
         content:
@@ -115,9 +113,35 @@ paths:
       tags:
       - Imagery
       summary: Get processing job status
-      description: "Poll the status of an imagery processing job. **STUB** \u2014\
-        \ Phase 3."
+      description: Poll the status of an imagery processing job.
       operationId: get_job_status_v1_imagery_jobs__job_id__get
+      parameters:
+      - name: job_id
+        in: path
+        required: true
+        schema:
+          type: string
+          title: Job Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobStatusResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /v1/imagery/jobs/{job_id}/retry:
+    post:
+      tags:
+      - Imagery
+      summary: Retry a processing job
+      description: Safely retry a failed or queued imagery processing job. Idempotent.
+      operationId: retry_job_v1_imagery_jobs__job_id__retry_post
       parameters:
       - name: job_id
         in: path
@@ -143,8 +167,7 @@ paths:
       tags:
       - Imagery
       summary: Get imagery tile metadata
-      description: "Retrieve metadata for an uploaded imagery tile. **STUB** \u2014\
-        \ Phase 3."
+      description: Retrieve metadata for an uploaded imagery tile.
       operationId: get_tile_v1_imagery_tiles__tile_id__get
       parameters:
       - name: tile_id
@@ -171,8 +194,7 @@ paths:
       tags:
       - Imagery
       summary: Get AI-extracted features for a tile
-      description: "List building footprints and other features extracted from a tile.\
-        \ **STUB** \u2014 populated by Akshaya's AI pipeline (Phase 3)."
+      description: List building footprints and other features extracted from a tile.
       operationId: get_tile_features_v1_imagery_tiles__tile_id__features_get
       parameters:
       - name: tile_id
@@ -201,7 +223,7 @@ paths:
       summary: Offline sync batch
       description: "Submit a batch of offline actions. Each action requires a ``client_action_id``\
         \ for idempotent replay. Conflicts are surfaced explicitly \u2014 no silent\
-        \ last-write-wins. **STUB** \u2014 Phase 3."
+        \ last-write-wins."
       operationId: sync_parcels_v1_parcels_sync_post
       requestBody:
         content:
@@ -227,9 +249,8 @@ paths:
       tags:
       - Parcels
       summary: List parcels
-      description: "Cursor-paginated list of parcels with optional filters. Filters:\
-        \ zone, jurisdiction, validation_status, confidence_min/max, flag_type. **STUB**\
-        \ \u2014 Phase 3."
+      description: 'Cursor-paginated list of parcels with optional filters. Filters:
+        zone, jurisdiction, validation_status, confidence_min/max.'
       operationId: list_parcels_v1_parcels_get
       parameters:
       - name: cursor
@@ -295,14 +316,6 @@ paths:
             minimum: 0.0
           - type: 'null'
           title: Confidence Max
-      - name: flag_type
-        in: query
-        required: false
-        schema:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Flag Type
       responses:
         '200':
           description: Successful Response
@@ -321,8 +334,7 @@ paths:
       tags:
       - Parcels
       summary: Get parcel detail
-      description: "Retrieve full parcel representation including geometry. **STUB**\
-        \ \u2014 Phase 3."
+      description: Retrieve full parcel representation including geometry.
       operationId: get_parcel_v1_parcels__parcel_id__get
       parameters:
       - name: parcel_id
@@ -349,9 +361,9 @@ paths:
       tags:
       - Parcels
       summary: Edit parcel geometry
-      description: "Apply a vertex edit, split, or merge operation to a parcel. Triggers\
-        \ topology validation hook (Arun). ``idempotency_key`` prevents duplicate\
-        \ edits on retry. **STUB** \u2014 Phase 3."
+      description: Apply a vertex edit, split, or merge operation to a parcel. Triggers
+        topology validation hook (Arun). ``idempotency_key`` prevents duplicate edits
+        on retry.
       operationId: edit_parcel_v1_parcels__parcel_id__edit_post
       parameters:
       - name: parcel_id
@@ -385,8 +397,7 @@ paths:
       - Parcels
       summary: Approve parcel
       description: "Human sign-off \u2014 marks the parcel as approved and eligible\
-        \ for export. Requires the parcel to be in 'validated' status. **STUB** \u2014\
-        \ Phase 3."
+        \ for export. Requires the parcel to be in 'validated' status."
       operationId: approve_parcel_v1_parcels__parcel_id__approve_post
       parameters:
       - name: parcel_id
@@ -419,8 +430,7 @@ paths:
       tags:
       - Parcels
       summary: Reject parcel
-      description: "Mark a parcel as rejected. Record is preserved for audit history.\
-        \ **STUB** \u2014 Phase 3."
+      description: Mark a parcel as rejected. Record is preserved for audit history.
       operationId: reject_parcel_v1_parcels__parcel_id__reject_post
       parameters:
       - name: parcel_id
@@ -451,8 +461,7 @@ paths:
   /v1/validations/queue:
     get:
       summary: Validation queue
-      description: "List parcels awaiting topology or confidence validation. **STUB**\
-        \ \u2014 populated by Arun's topology pipeline (Phase 3)."
+      description: List parcels awaiting topology or confidence validation.
       operationId: get_validation_queue_v1_validations_queue_get
       responses:
         '200':
@@ -464,8 +473,7 @@ paths:
   /v1/validations/run:
     post:
       summary: Trigger validation run
-      description: "Trigger topology and confidence validation for a set of parcels.\
-        \ **STUB** \u2014 invokes Arun's TopologyValidationService (Phase 3)."
+      description: Trigger topology and confidence validation for a set of parcels.
       operationId: run_validation_v1_validations_run_post
       requestBody:
         content:
@@ -491,8 +499,7 @@ paths:
       tags:
       - Validation
       summary: Get validation flags for a parcel
-      description: "List all validation flags on a specific parcel. **STUB** \u2014\
-        \ Phase 3."
+      description: List all validation flags on a specific parcel.
       operationId: get_parcel_flags_v1_parcels__parcel_id__flags_get
       parameters:
       - name: parcel_id
@@ -726,8 +733,7 @@ paths:
       tags:
       - Audit
       summary: Verify audit chain integrity
-      description: "Verify the hash-chain integrity for a parcel's audit trail. **INTEGRATION\
-        \ STUB** \u2014 Prajith's chain verification (Phase 3)."
+      description: Verify the SHA-256 hash-chain integrity for a parcel's audit trail.
       operationId: verify_audit_chain_v1_audit_verify__parcel_id__get
       parameters:
       - name: parcel_id
@@ -754,7 +760,7 @@ paths:
       tags:
       - Audit
       summary: Export audit batch
-      description: "Export a batch of audit log entries. **STUB** \u2014 Phase 3."
+      description: Export a batch of audit log entries.
       operationId: export_audit_batch_v1_audit_export__batch_id__get
       parameters:
       - name: batch_id
@@ -781,8 +787,7 @@ paths:
       tags:
       - Audit
       summary: Get parcel audit trail
-      description: "Retrieve the complete audit trail for a parcel. **STUB** \u2014\
-        \ Phase 3."
+      description: Retrieve the complete audit trail for a parcel.
       operationId: get_parcel_audit_v1_audit__parcel_id__get
       parameters:
       - name: parcel_id
