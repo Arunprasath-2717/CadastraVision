@@ -7,38 +7,43 @@ export default {
   theme: {
     extend: {
       colors: {
+        cv: {
+          cyan: '#A7EBF2',
+          'cyan-strong': '#54ACBF',
+          blue: '#266580',
+          'blue-deep': '#023859',
+          navy: '#011C40',
+        },
         pastel: {
-          bg: '#F6F7FB',             // Soft gray-blue background
-          surface: '#FFFFFF',        // Primary white surface
-          'surface-soft': '#FAFAFD', // Secondary surface
-          lavender: '#F1EFFA',       // Accent background surface
-          border: '#DDE2EC',         // Soft border line
-          'border-soft': '#E8E5F0',    // Muted border
-          text: '#273044',           // Primary dark text (WCAG AA compliant)
-          muted: '#657086',          // Secondary text
-          subtle: '#8A93A5',         // Muted text
-          periwinkle: '#8FA7E8',     // Brand primary pastel
-          action: '#5876C9',         // Accessible deep action blue
-          'action-hover': '#4361B3',  // Hover action blue
-          accent: '#B6A7D9',         // Soft lavender accent
-          
-          // Semantic GIS Pastel Colors (WCAG AA Dual Encoding)
-          mint: '#A9D8C8',           // High confidence pastel mint
-          'mint-text': '#24614E',      // High confidence text/icon
-          amber: '#F1D98B',          // Medium confidence pastel amber
-          'amber-text': '#85610D',     // Medium confidence text/icon
-          rose: '#E7B5C5',           // Low confidence pastel rose
-          'rose-text': '#96364C',      // Low confidence text/icon
-          coral: '#F0B7AE',          // Validation error soft coral
-          'coral-text': '#9C3333',     // Validation error text/icon
+          bg: '#EAF8FB',
+          surface: '#F7FCFE',
+          'surface-soft': '#EEF9FB',
+          lavender: '#E9F6FB',
+          border: '#C9E5EE',
+          'border-soft': '#D8EDF5',
+          text: '#0D2E46',
+          muted: '#4F7285',
+          subtle: '#6F8DA0',
+          periwinkle: '#8ECDE6',
+          action: '#266580',
+          'action-hover': '#023859',
+          accent: '#54ACBF',
+          mint: '#A7EBF2',
+          'mint-text': '#0B5463',
+          amber: '#F6D7A6',
+          'amber-text': '#7E560B',
+          rose: '#E9BAC8',
+          'rose-text': '#8A3348',
+          coral: '#F0B7AE',
+          'coral-text': '#9C3333',
         },
         gov: {
-          bg: '#0B1220',
-          surface: '#111827',
-          card: '#1E293B',
-          border: '#334155',
-          primary: '#1D4ED8',
-          text: '#F8FAFC',
+          bg: '#011C40',
+          surface: '#023859',
+          card: '#0B2D4A',
+          border: '#2B6C88',
+          primary: '#266580',
+          text: '#F2FBFF',
         }
       },
       fontFamily: {
@@ -47,10 +52,10 @@ export default {
         display: ['Cinzel', 'Inter', 'sans-serif']
       },
       boxShadow: {
-        'pastel-sm': '0 2px 8px rgba(39, 48, 68, 0.04)',
-        'pastel-md': '0 4px 16px rgba(39, 48, 68, 0.08)',
-        'pastel-lg': '0 12px 32px rgba(39, 48, 68, 0.12)',
-        'pastel-glow': '0 0 20px rgba(143, 167, 232, 0.3)',
+        'pastel-sm': '0 8px 20px rgba(1, 28, 64, 0.06)',
+        'pastel-md': '0 12px 28px rgba(2, 56, 89, 0.10)',
+        'pastel-lg': '0 18px 38px rgba(1, 28, 64, 0.12)',
+        'pastel-glow': '0 0 24px rgba(167, 235, 242, 0.35)',
       }
     },
   },

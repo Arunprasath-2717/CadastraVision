@@ -5,6 +5,12 @@ import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { AISpatialPage } from './pages/AISpatialPage';
+import { ReviewValidationPage } from './pages/ReviewValidationPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
+import { HistoryPage } from './pages/HistoryPage';
+import { ReportsPage } from './pages/ReportsPage';
+import { CommandCenterLayout } from './components/layout/CommandCenterLayout';
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
@@ -29,7 +35,14 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
+
+          <Route path="/dashboard" element={<ProtectedRoute><CommandCenterLayout page={DashboardPage} /></ProtectedRoute>} />
+          <Route path="/ai-analysis" element={<ProtectedRoute><CommandCenterLayout page={AISpatialPage} /></ProtectedRoute>} />
+          <Route path="/review" element={<ProtectedRoute><CommandCenterLayout page={ReviewValidationPage} /></ProtectedRoute>} />
+          <Route path="/analytics" element={<ProtectedRoute><CommandCenterLayout page={AnalyticsPage} /></ProtectedRoute>} />
+          <Route path="/history" element={<ProtectedRoute><CommandCenterLayout page={HistoryPage} /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute><CommandCenterLayout page={ReportsPage} /></ProtectedRoute>} />
+
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
