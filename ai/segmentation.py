@@ -360,8 +360,9 @@ class CadastralSegmentationPipeline:
         min_rect_area = min_rect.area
         regularity = float(poly.area / min_rect_area) if min_rect_area > 0.0 else 0.0
 
-        # 2. Compactness (Isoperimetric Quotient)
-        perimeter = poly.length
+        # 2. Compactness (Isoperimetric Quotient using Convex Hull perimeter)
+        convex_hull = poly.convex_hull
+        perimeter = convex_hull.length
         compactness = float((4.0 * np.pi * poly.area) / (perimeter ** 2)) if perimeter > 0.0 else 0.0
 
         # 3. Polygon-Mask IoU (contour fidelity)
