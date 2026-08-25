@@ -27,28 +27,20 @@ def test_real_image():
     os.makedirs(os.path.dirname(temp_crop_path), exist_ok=True)
 
     try:
-        with rasterio.open(tiff_path) as src:
-            h, w = src.height, src.width
-            print(f"Original dimensions: {w}x{h}")
-            
-            # Define center 1024x1024 window
-            win_size = 1024
-            x_offset = (w - win_size) // 2
-            y_offset = (h - win_size) // 2
-            window = rasterio.windows.Window(x_offset, y_offset, win_size, win_size)
-            
-            # Read channels 1, 2, 3
-            if src.count >= 3:
-                tile_data = src.read([1, 2, 3], window=window)
-                img_rgb = np.transpose(tile_data, (1, 2, 0))
-            else:
-                tile_data = src.read(1, window=window)
-                img_rgb = np.stack([tile_data, tile_data, tile_data], axis=-1)
-
-            # Convert to BGR for OpenCV saving
-            img_bgr = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(temp_crop_path, img_bgr)
-            print(f"Cropped 1024x1024 center region and saved to: {temp_crop_path}")
+        img = cv2.imread(tiff_path)
+        if img is None:
+            raise ValueError(f"Failed to read image using OpenCV: {tiff_path}")
+        h, w = img.shape[:2]
+        print(f"Original dimensions: {w}x{h}")
+        
+        # Crop 1024x1024 region from center
+        win_size = 1024
+        x_offset = (w - win_size) // 2
+        y_offset = (h - win_size) // 2
+        crop = img[y_offset:y_offset+win_size, x_offset:x_offset+win_size]
+        
+        cv2.imwrite(temp_crop_path, crop)
+        print(f"Cropped 1024x1024 center region and saved to: {temp_crop_path}")
 
     except Exception as e:
         print(f"[ERROR] Failed to read/crop TIFF: {e}", file=sys.stderr)
@@ -59,11 +51,12 @@ def test_real_image():
     print("\nSending crop to Roboflow workflow inference...")
     try:
         predictions = segment_with_roboflow(
-            image_input=temp_crop_path,
+            image_input=crop,
             api_key="Z1p45q88sPkLrUdN289r",
             workspace="ragul-wwpql",
             workflow_id="map-aoz8d",
-            save_visual_path=visual_output_path
+            save_visual_path=visual_output_path,
+            confidence=0.25
         )
         
         print("\n--- Inference Output Results ---")

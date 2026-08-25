@@ -56,6 +56,36 @@ def compute_sha256(filepath: str) -> str:
         return "error"
 
 
+def decode_rle(rle_counts, height, width):
+    if isinstance(rle_counts, str):
+        rle_counts = rle_counts.encode('utf-8')
+    
+    counts = []
+    i = 0
+    while i < len(rle_counts):
+        x, more = 0, 0
+        while True:
+            c = rle_counts[i] - 48
+            x |= (c & 0x1f) << 5 * more
+            more += 1
+            i += 1
+            if not (c & 0x20):
+                break
+        if more > 2 and (c & 0x10):
+            x |= -1 << 5 * more
+        counts.append(x)
+    
+    mask = np.zeros(height * width, dtype=np.uint8)
+    val = 0
+    idx = 0
+    for count in counts:
+        mask[idx : idx + count] = val
+        idx += count
+        val = 1 - val
+    
+    return mask.reshape((height, width), order='F')
+
+
 class CadastralSegmentationPipeline:
     """
     Modular cadastral segmentation pipeline supporting dual-model architecture
@@ -357,7 +387,8 @@ class CadastralSegmentationPipeline:
                     "image": {
                         "type": "base64",
                         "value": base64_image
-                    }
+                    },
+                    "confidence": 0.25
                 }
             }
 
@@ -373,14 +404,23 @@ class CadastralSegmentationPipeline:
                 predictions = outputs[0].get("predictions", {}).get("predictions", [])
                 masks_list = []
                 for pred in predictions:
-                    pts = pred.get("points", [])
-                    if not pts:
-                        continue
-
-                    poly_pts = np.array([[int(p["x"]), int(p["y"])] for p in pts], dtype=np.int32)
-                    mask = np.zeros((h, w), dtype=np.uint8)
-                    cv2.fillPoly(mask, [poly_pts], 255)
-                    masks_list.append(mask)
+                    rle = pred.get("rle_mask")
+                    if rle:
+                        counts = rle.get("counts")
+                        size = rle.get("size")
+                        mask = decode_rle(counts, size[0], size[1])
+                        if mask.shape != (h, w):
+                            mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
+                        mask = (mask * 255).astype(np.uint8)
+                        masks_list.append(mask)
+                    else:
+                        pts = pred.get("points", [])
+                        if not pts:
+                            continue
+                        poly_pts = np.array([[int(p["x"]), int(p["y"])] for p in pts], dtype=np.int32)
+                        mask = np.zeros((h, w), dtype=np.uint8)
+                        cv2.fillPoly(mask, [poly_pts], 255)
+                        masks_list.append(mask)
 
                 if not masks_list:
                     return [np.zeros((h, w), dtype=np.uint8)]
@@ -1063,7 +1103,8 @@ def segment_with_roboflow(
     api_key: str = "Z1p45q88sPkLrUdN289r",
     workspace: str = "ragul-wwpql",
     workflow_id: str = "map-aoz8d",
-    save_visual_path: Optional[str] = "roboflow_visualized.png"
+    save_visual_path: Optional[str] = "roboflow_visualized.png",
+    confidence: float = 0.25
 ) -> list[dict]:
     """
     Integrates Roboflow workflow inference into Python:
@@ -1098,7 +1139,8 @@ def segment_with_roboflow(
             "image": {
                 "type": "base64",
                 "value": base64_image
-            }
+            },
+            "confidence": confidence
         }
     }
 
@@ -1112,6 +1154,7 @@ def segment_with_roboflow(
 
     res_json = response.json()
     outputs = res_json.get("outputs", [])
+    logger.info(f"Roboflow raw predictions count: {len(outputs[0].get('predictions', {}).get('predictions', [])) if outputs else 'no outputs'}")
     if not outputs:
         logger.warning("Roboflow response contains no outputs block.")
         return []
@@ -1132,29 +1175,43 @@ def segment_with_roboflow(
     for pred in predictions:
         class_name = pred.get("class", "unknown").lower()
         confidence = pred.get("confidence", 0.0)
-        pts = pred.get("points", [])
-        if not pts:
-            continue
-
-        # Format points as tuple list: [(x, y), ...]
-        polygon_coords = [(float(p["x"]), float(p["y"])) for p in pts]
-        parsed_polygons.append({
-            "class": class_name,
-            "confidence": float(confidence),
-            "points": polygon_coords
-        })
-
-        # Draw outline on image
-        poly_pts = np.array([[int(p[0]), int(p[1])] for p in polygon_coords], dtype=np.int32)
-        color = class_colors.get(class_name, default_color)
         
-        cv2.polylines(img, [poly_pts], isClosed=True, color=color, thickness=2)
+        rle = pred.get("rle_mask")
+        polygon_list = []
         
-        # Add label and confidence text
-        label_text = f"{class_name} ({confidence*100:.1f}%)" if confidence <= 1.0 else f"{class_name} ({confidence:.1f}%)"
-        if len(poly_pts) > 0:
-            text_pos = (poly_pts[0][0], max(15, poly_pts[0][1] - 5))
-            cv2.putText(img, label_text, text_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
+        if rle:
+            counts = rle.get("counts")
+            size = rle.get("size")
+            mask = decode_rle(counts, size[0], size[1])
+            if mask.shape != (h, w):
+                mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            for cnt in contours:
+                if cv2.contourArea(cnt) < 5 and len(cnt) < 3:
+                    continue
+                poly_coords = [(float(pt[0][0]), float(pt[0][1])) for pt in cnt]
+                polygon_list.append(poly_coords)
+        else:
+            pts = pred.get("points", [])
+            if pts:
+                poly_coords = [(float(p["x"]), float(p["y"])) for p in pts]
+                polygon_list.append(poly_coords)
+                
+        for poly_coords in polygon_list:
+            parsed_polygons.append({
+                "class": class_name,
+                "confidence": float(confidence),
+                "points": poly_coords
+            })
+
+            poly_pts = np.array([[int(p[0]), int(p[1])] for p in poly_coords], dtype=np.int32)
+            color = class_colors.get(class_name, default_color)
+            cv2.polylines(img, [poly_pts], isClosed=True, color=color, thickness=2)
+            
+            label_text = f"{class_name} ({confidence*100:.1f}%)" if confidence <= 1.0 else f"{class_name} ({confidence:.1f}%)"
+            if len(poly_pts) > 0:
+                text_pos = (poly_pts[0][0], max(15, poly_pts[0][1] - 5))
+                cv2.putText(img, label_text, text_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
 
     # Save visualization if path is specified
     if save_visual_path:
