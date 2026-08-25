@@ -12,6 +12,7 @@ export function MapProvider({ children }) {
     parcels: true,
     buildings: true,
     roads: true,
+    fields: true,
     flags: true,
     openfreemap: true,
     overpass: true,

@@ -212,7 +212,42 @@ export function MapView() {
       setLoading(false);
     });
 
+    const handleRefreshLayers = async (e) => {
+      if (!mapRef.current) return;
+      const targetLayer = e.detail?.layer;
+
+      if (!targetLayer || targetLayer === 'parcels' || targetLayer === 'fields') {
+        const parcelsGeoJSON = await geoApi.getParcelGeoJSON();
+        if (mapRef.current.getSource('parcels-source')) {
+          mapRef.current.getSource('parcels-source').setData(parcelsGeoJSON);
+        }
+      }
+      if (!targetLayer || targetLayer === 'buildings') {
+        const buildingsGeoJSON = await geoApi.getBuildingsGeoJSON();
+        if (mapRef.current.getSource('buildings-source')) {
+          mapRef.current.getSource('buildings-source').setData(buildingsGeoJSON);
+        }
+      }
+      if (!targetLayer || targetLayer === 'roads') {
+        const roadsGeoJSON = await geoApi.getRoadsGeoJSON();
+        if (mapRef.current.getSource('roads-source')) {
+          mapRef.current.getSource('roads-source').setData(roadsGeoJSON);
+        }
+      }
+      if (!targetLayer || targetLayer === 'overpass') {
+        setOverpassLoading(true);
+        const overpassGeoJSON = await overpassApi.fetchBBoxFeatures([77.58, 12.96, 77.61, 12.98]);
+        setOverpassLoading(false);
+        if (mapRef.current.getSource('overpass-source')) {
+          mapRef.current.getSource('overpass-source').setData(overpassGeoJSON);
+        }
+      }
+    };
+
+    window.addEventListener('cadastra:refresh-map-layers', handleRefreshLayers);
+
     return () => {
+      window.removeEventListener('cadastra:refresh-map-layers', handleRefreshLayers);
       map.remove();
       mapRef.current = null;
     };
