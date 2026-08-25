@@ -27,3 +27,5 @@ venv/
 output_visualized.png
 cache/
 temp/
+*.db
+database/*.db

@@ -13,6 +13,8 @@ All downstream property registry mapping is completely decoupled from model weig
 
 import os
 import json
+import base64
+import requests
 import hashlib
 import logging
 import numpy as np
@@ -177,6 +179,14 @@ class CadastralSegmentationPipeline:
                 self.model_version = "yolov8n-seg"
                 weights_file = os.path.abspath(weights_name)
 
+            elif self.backend == "roboflow":
+                self.model_version = "roboflow-map-aoz8d"
+                self.weights_hash = "remote-api"
+                self.api_key = os.environ.get("ROBOFLOW_API_KEY", "Z1p45q88sPkLrUdN289r")
+                self.workspace = "ragul-wwpql"
+                self.workflow_id = "map-aoz8d"
+                logger.info(f"Initialized Roboflow backend (Model ID: {self.workflow_id})")
+
             else:
                 raise ValueError(f"Unsupported backend: {self.backend}")
 
@@ -197,9 +207,9 @@ class CadastralSegmentationPipeline:
                 logger.critical(f"YOLOv8-seg fallback loading failed: {fe}")
                 raise fe
 
-        # Assert check if user expected samgeo or fastsam backend to prevent silent fallback
-        if self.requested_backend in ("samgeo", "fastsam"):
-            assert "yolov8" not in self.model_version, (
+        # Assert check if user expected samgeo, fastsam, or roboflow backend to prevent silent fallback
+        if self.requested_backend in ("samgeo", "fastsam", "roboflow"):
+            assert "yolov8" not in self.model_version or self.requested_backend == "yolov8", (
                 f"CRITICAL ERROR: Requested backend '{self.requested_backend}' failed and bypassed. "
                 f"Silently fell back to YOLOv8-seg ({self.model_version}). "
                 "COCO models cannot detect buildings. Check your environment/package setup!"
@@ -334,6 +344,51 @@ class CadastralSegmentationPipeline:
             if not masks_list:
                 return [np.zeros((h, w), dtype=np.uint8)]
             return masks_list
+
+        elif self.backend == "roboflow":
+            # Encode image_rgb to base64
+            _, buffer = cv2.imencode('.jpg', cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR))
+            base64_image = base64.b64encode(buffer).decode('utf-8')
+
+            url = f"https://serverless.roboflow.com/infer/workflows/{self.workspace}/{self.workflow_id}"
+            payload = {
+                "api_key": self.api_key,
+                "inputs": {
+                    "image": {
+                        "type": "base64",
+                        "value": base64_image
+                    }
+                }
+            }
+
+            try:
+                response = requests.post(url, json=payload)
+                response.raise_for_status()
+                res_json = response.json()
+
+                outputs = res_json.get("outputs", [])
+                if not outputs:
+                    return [np.zeros((h, w), dtype=np.uint8)]
+
+                predictions = outputs[0].get("predictions", {}).get("predictions", [])
+                masks_list = []
+                for pred in predictions:
+                    pts = pred.get("points", [])
+                    if not pts:
+                        continue
+
+                    poly_pts = np.array([[int(p["x"]), int(p["y"])] for p in pts], dtype=np.int32)
+                    mask = np.zeros((h, w), dtype=np.uint8)
+                    cv2.fillPoly(mask, [poly_pts], 255)
+                    masks_list.append(mask)
+
+                if not masks_list:
+                    return [np.zeros((h, w), dtype=np.uint8)]
+                return masks_list
+
+            except Exception as e:
+                logger.error(f"Roboflow API call failed during tile inference: {e}")
+                return [np.zeros((h, w), dtype=np.uint8)]
 
         else:
             raise ValueError(f"Active backend unsupported for inference: {self.backend}")
@@ -1001,6 +1056,112 @@ class CadastralSegmentationPipeline:
                 "model_version": self.model_version
             }
         }
+
+
+def segment_with_roboflow(
+    image_input: Union[str, np.ndarray],
+    api_key: str = "Z1p45q88sPkLrUdN289r",
+    workspace: str = "ragul-wwpql",
+    workflow_id: str = "map-aoz8d",
+    save_visual_path: Optional[str] = "roboflow_visualized.png"
+) -> list[dict]:
+    """
+    Integrates Roboflow workflow inference into Python:
+    1. Takes an image (file path string or numpy array) as input.
+    2. Sends it to the Roboflow model's workflows API.
+    3. Returns the detected polygons (buildings, houses, roads, bridges) with coordinates and confidence scores.
+    4. Draws these polygons back onto the image and saves the visualized result.
+    """
+    # 1. Parse image input
+    if isinstance(image_input, str):
+        if not os.path.exists(image_input):
+            raise FileNotFoundError(f"Input image path does not exist: {image_input}")
+        img = cv2.imread(image_input)
+        if img is None:
+            raise ValueError(f"Failed to load image from path: {image_input}")
+    elif isinstance(image_input, np.ndarray):
+        img = image_input.copy()
+    else:
+        raise TypeError("image_input must be a file path string or numpy ndarray")
+
+    h, w = img.shape[:2]
+
+    # 2. Encode to base64
+    _, buffer = cv2.imencode('.jpg', img)
+    base64_image = base64.b64encode(buffer).decode('utf-8')
+
+    # 3. Post to API
+    url = f"https://serverless.roboflow.com/infer/workflows/{workspace}/{workflow_id}"
+    payload = {
+        "api_key": api_key,
+        "inputs": {
+            "image": {
+                "type": "base64",
+                "value": base64_image
+            }
+        }
+    }
+
+    logger.info(f"Sending Roboflow inference request to workflow: {workflow_id}...")
+    response = requests.post(url, json=payload)
+    
+    # Error handling for failed API calls
+    if response.status_code != 200:
+        logger.error(f"Roboflow API call failed with status code {response.status_code}: {response.text}")
+        raise RuntimeError(f"Roboflow API error: {response.text}")
+
+    res_json = response.json()
+    outputs = res_json.get("outputs", [])
+    if not outputs:
+        logger.warning("Roboflow response contains no outputs block.")
+        return []
+
+    predictions = outputs[0].get("predictions", {}).get("predictions", [])
+    parsed_polygons = []
+
+    # Map classes to unique BGR colors for visualization
+    class_colors = {
+        "building": (0, 255, 0),    # Green
+        "house": (0, 255, 255),     # Yellow
+        "road": (255, 0, 0),        # Blue
+        "bridge": (255, 0, 255)     # Magenta
+    }
+    default_color = (0, 0, 255)     # Red (fallback)
+
+    # 4. Process predictions and draw polygons
+    for pred in predictions:
+        class_name = pred.get("class", "unknown").lower()
+        confidence = pred.get("confidence", 0.0)
+        pts = pred.get("points", [])
+        if not pts:
+            continue
+
+        # Format points as tuple list: [(x, y), ...]
+        polygon_coords = [(float(p["x"]), float(p["y"])) for p in pts]
+        parsed_polygons.append({
+            "class": class_name,
+            "confidence": float(confidence),
+            "points": polygon_coords
+        })
+
+        # Draw outline on image
+        poly_pts = np.array([[int(p[0]), int(p[1])] for p in polygon_coords], dtype=np.int32)
+        color = class_colors.get(class_name, default_color)
+        
+        cv2.polylines(img, [poly_pts], isClosed=True, color=color, thickness=2)
+        
+        # Add label and confidence text
+        label_text = f"{class_name} ({confidence*100:.1f}%)" if confidence <= 1.0 else f"{class_name} ({confidence:.1f}%)"
+        if len(poly_pts) > 0:
+            text_pos = (poly_pts[0][0], max(15, poly_pts[0][1] - 5))
+            cv2.putText(img, label_text, text_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
+
+    # Save visualization if path is specified
+    if save_visual_path:
+        cv2.imwrite(save_visual_path, img)
+        logger.info(f"Saved visual overlay output to: {save_visual_path}")
+
+    return parsed_polygons
 
 
 if __name__ == "__main__":

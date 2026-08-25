@@ -13,6 +13,8 @@ All downstream property registry mapping is completely decoupled from model weig
 
 import os
 import json
+import base64
+import requests
 import hashlib
 import logging
 import numpy as np
@@ -66,6 +68,8 @@ class CadastralSegmentationPipeline:
         backend: str = "samgeo",
         model_path: Optional[str] = None,
         device: Optional[str] = None,
+        points_per_side: int = 64,
+        crop_overlap_ratio: float = 512 / 1500,
     ) -> None:
         """
         Initializes the segmentation pipeline and loads the specified AI backend.
@@ -75,7 +79,10 @@ class CadastralSegmentationPipeline:
                      Can be overridden by the CADASTRAL_SEG_BACKEND environment variable.
             model_path: Optional local path to model weights file.
             device: Target execution device ('cuda', 'cpu', etc.). Auto-detected if None.
+            points_per_side: Number of points per side for automatic mask generation.
+            crop_overlap_ratio: Overlap ratio between crops for SAM generator.
         """
+        self.requested_backend = backend.lower()
         # Resolve backend using constructor arg or environment variable override
         env_backend = os.environ.get("CADASTRAL_SEG_BACKEND", None)
         if env_backend:
@@ -85,6 +92,8 @@ class CadastralSegmentationPipeline:
         self.backend = backend.lower()
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         self.model_path = model_path
+        self.points_per_side = points_per_side
+        self.crop_overlap_ratio = crop_overlap_ratio
 
         # Geometric tolerances and post-processing filters
         self.pixel_tolerance = 0.5  # Simplification tolerance in pixel space
@@ -99,6 +108,7 @@ class CadastralSegmentationPipeline:
         self.weights_hash: str = "unknown"
 
         self._load_backend()
+        logger.info(f"Active backend after initialization: {self.backend} (Model Version: {self.model_version})")
 
     def _load_backend(self) -> None:
         """Loads the selected backend and registers weights path and hash."""
@@ -109,12 +119,22 @@ class CadastralSegmentationPipeline:
             if self.backend == "samgeo":
                 try:
                     from samgeo.fast_sam import SamGeo
-                    weights_name = self.model_path if self.model_path else "FastSAM-s.pt"
-                    logger.info(f"Attempting to load samgeo.fast_sam with weights: {weights_name}")
-                    self.model = SamGeo(model=weights_name, checkpoint_dir=None, device=self.device)
+                    if self.model_path:
+                        weights_name = os.path.basename(self.model_path)
+                        checkpoint_dir = os.path.dirname(self.model_path)
+                    else:
+                        weights_name = "FastSAM-s.pt"
+                        checkpoint_dir = "."
+                    logger.info(f"Attempting to load samgeo.fast_sam with weights: {weights_name} from checkpoint_dir: {checkpoint_dir}")
+                    self.model = SamGeo(model=weights_name, checkpoint_dir=checkpoint_dir)
+                    try:
+                        self.model.to(self.device)
+                    except Exception as device_err:
+                        logger.warning(f"Could not move samgeo.fast_sam model to device {self.device}: {device_err}")
                     self.model_version = "samgeo-fastsam-s"
-                    weights_file = os.path.abspath(weights_name)
+                    weights_file = os.path.abspath(os.path.join(checkpoint_dir, weights_name))
                 except Exception as ex:
+                    logger.warning(f"[FALLBACK WARNING] Failed to load samgeo.fast_sam: {ex}. Falling back to standard SamGeo (vit_b).")
                     from samgeo import SamGeo
                     # Default to lightweight vit_b to prevent GTX 1650 OOM
                     model_type = "vit_b"
@@ -123,7 +143,9 @@ class CadastralSegmentationPipeline:
                         "stability_score_thresh": 0.80,
                         "min_mask_region_area": 1000,
                         "crop_n_layers": 1,
-                        "box_nms_thresh": 0.70
+                        "crop_overlap_ratio": self.crop_overlap_ratio,
+                        "box_nms_thresh": 0.70,
+                        "points_per_side": self.points_per_side
                     }
                     if self.model_path:
                         self.model = SamGeo(
@@ -157,12 +179,20 @@ class CadastralSegmentationPipeline:
                 self.model_version = "yolov8n-seg"
                 weights_file = os.path.abspath(weights_name)
 
+            elif self.backend == "roboflow":
+                self.model_version = "roboflow-map-aoz8d"
+                self.weights_hash = "remote-api"
+                self.api_key = os.environ.get("ROBOFLOW_API_KEY", "Z1p45q88sPkLrUdN289r")
+                self.workspace = "ragul-wwpql"
+                self.workflow_id = "map-aoz8d"
+                logger.info(f"Initialized Roboflow backend (Model ID: {self.workflow_id})")
+
             else:
                 raise ValueError(f"Unsupported backend: {self.backend}")
 
         except Exception as e:
-            logger.error(
-                f"Failed to load primary backend '{self.backend}': {e}. "
+            logger.warning(
+                f"[FALLBACK WARNING] Failed to load primary backend '{self.backend}' with exception: {e}. "
                 "Attempting fallback to YOLOv8-seg (yolov8n-seg.pt)."
             )
             try:
@@ -176,6 +206,14 @@ class CadastralSegmentationPipeline:
             except Exception as fe:
                 logger.critical(f"YOLOv8-seg fallback loading failed: {fe}")
                 raise fe
+
+        # Assert check if user expected samgeo, fastsam, or roboflow backend to prevent silent fallback
+        if self.requested_backend in ("samgeo", "fastsam", "roboflow"):
+            assert "yolov8" not in self.model_version or self.requested_backend == "yolov8", (
+                f"CRITICAL ERROR: Requested backend '{self.requested_backend}' failed and bypassed. "
+                f"Silently fell back to YOLOv8-seg ({self.model_version}). "
+                "COCO models cannot detect buildings. Check your environment/package setup!"
+            )
 
         # Compute weights SHA-256 for MLOps tracking
         if weights_file:
@@ -230,13 +268,35 @@ class CadastralSegmentationPipeline:
                 self.model.set_image(image_rgb, device=self.device)
                 ann = self.model.everything_prompt()
                 masks_list = []
-                if ann is not None and len(ann.shape) == 3 and ann.shape[0] > 0:
+                if ann is not None and hasattr(ann, "shape") and len(ann.shape) == 3 and ann.shape[0] > 0:
                     num_masks = ann.shape[0]
                     for i in range(num_masks):
                         mask = (ann[i] > 0).cpu().numpy().astype(np.uint8) * 255
                         if mask.shape != (h, w):
                             mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
                         masks_list.append(mask)
+                
+                # Check for zero/near-zero masks (total sum of mask pixels < 1000)
+                total_sum = sum(np.sum(m > 0) for m in masks_list)
+                if not masks_list or total_sum < 1000:
+                    logger.info(f"Automatic fastsam everything_prompt returned zero/near-zero masks (total pixels: {total_sum}). Running box-prompted fallback...")
+                    box = [int(w * 0.05), int(h * 0.05), int(w * 0.95), int(h * 0.95)]
+                    ann_box = self.model.box_prompt(bbox=box)
+                    fallback_masks = []
+                    if ann_box is not None and hasattr(ann_box, "shape") and len(ann_box.shape) == 3 and ann_box.shape[0] > 0:
+                        num_masks = ann_box.shape[0]
+                        for i in range(num_masks):
+                            mask = (ann_box[i] > 0)
+                            if torch.is_tensor(mask):
+                                mask = mask.cpu().numpy()
+                            mask = mask.astype(np.uint8) * 255
+                            if mask.shape != (h, w):
+                                mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
+                            fallback_masks.append(mask)
+                    if fallback_masks:
+                        logger.info(f"Box-prompted fastsam fallback generated {len(fallback_masks)} masks.")
+                        return fallback_masks
+
                 if not masks_list:
                     return [np.zeros((h, w), dtype=np.uint8)]
                 return masks_list
@@ -244,6 +304,20 @@ class CadastralSegmentationPipeline:
                 # SamGeo generate writes binary output mask to self.model.objects when output=None and unique=False
                 self.model.generate(image_rgb, output=None, unique=False)
                 mask = self.model.objects
+                if mask is None or np.sum(mask > 0) < 1000:
+                    logger.info(f"Automatic standard SAM objects mask is zero/near-zero. Running box-prompted fallback...")
+                    self.model.set_image(image_rgb)
+                    box = [[int(w * 0.05), int(h * 0.05), int(w * 0.95), int(h * 0.95)]]
+                    res = self.model.predict(boxes=box, return_results=True)
+                    if res is not None:
+                        masks, scores, logits = res
+                        fallback_masks = []
+                        if masks is not None and len(masks) > 0:
+                            for m in masks:
+                                fallback_masks.append(m.astype(np.uint8) * 255)
+                        if fallback_masks:
+                            logger.info(f"Box-prompted standard SAM fallback generated {len(fallback_masks)} masks.")
+                            return fallback_masks
                 if mask is not None:
                     return mask.astype(np.uint8)
                 return np.zeros((h, w), dtype=np.uint8)
@@ -270,6 +344,51 @@ class CadastralSegmentationPipeline:
             if not masks_list:
                 return [np.zeros((h, w), dtype=np.uint8)]
             return masks_list
+
+        elif self.backend == "roboflow":
+            # Encode image_rgb to base64
+            _, buffer = cv2.imencode('.jpg', cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR))
+            base64_image = base64.b64encode(buffer).decode('utf-8')
+
+            url = f"https://serverless.roboflow.com/infer/workflows/{self.workspace}/{self.workflow_id}"
+            payload = {
+                "api_key": self.api_key,
+                "inputs": {
+                    "image": {
+                        "type": "base64",
+                        "value": base64_image
+                    }
+                }
+            }
+
+            try:
+                response = requests.post(url, json=payload)
+                response.raise_for_status()
+                res_json = response.json()
+
+                outputs = res_json.get("outputs", [])
+                if not outputs:
+                    return [np.zeros((h, w), dtype=np.uint8)]
+
+                predictions = outputs[0].get("predictions", {}).get("predictions", [])
+                masks_list = []
+                for pred in predictions:
+                    pts = pred.get("points", [])
+                    if not pts:
+                        continue
+
+                    poly_pts = np.array([[int(p["x"]), int(p["y"])] for p in pts], dtype=np.int32)
+                    mask = np.zeros((h, w), dtype=np.uint8)
+                    cv2.fillPoly(mask, [poly_pts], 255)
+                    masks_list.append(mask)
+
+                if not masks_list:
+                    return [np.zeros((h, w), dtype=np.uint8)]
+                return masks_list
+
+            except Exception as e:
+                logger.error(f"Roboflow API call failed during tile inference: {e}")
+                return [np.zeros((h, w), dtype=np.uint8)]
 
         else:
             raise ValueError(f"Active backend unsupported for inference: {self.backend}")
@@ -669,6 +788,17 @@ class CadastralSegmentationPipeline:
                     "compactness": avg_compactness
                 }
                 
+                # Propagate tile_coords as list of unique tuples
+                t_coords = set()
+                for idx in comp:
+                    tc = parsed_features[idx]["properties"].get("tile_coords")
+                    if tc:
+                        if isinstance(tc, list):
+                            for item in tc:
+                                t_coords.add(tuple(item))
+                        else:
+                            t_coords.add(tuple(tc))
+
                 merged_feat = {
                     "geometry": union_shape,
                     "properties": {
@@ -676,13 +806,18 @@ class CadastralSegmentationPipeline:
                         "confidence_breakdown": avg_breakdown,
                         "model_version": parsed_features[comp[0]]["properties"].get("model_version", "unknown"),
                         "weights_hash": parsed_features[comp[0]]["properties"].get("weights_hash", "unknown"),
+                        "tile_coords": list(t_coords),
                     }
                 }
                 merged_features.append(merged_feat)
             except Exception as e:
                 logger.warning(f"Error unioning component: {e}")
                 best_idx = max(comp, key=lambda idx: parsed_features[idx]["properties"].get("confidence", 0.0))
-                merged_features.append(features[best_idx])
+                tc = parsed_features[best_idx]["properties"].get("tile_coords")
+                fallback_feat = features[best_idx].copy()
+                fallback_feat["properties"] = fallback_feat["properties"].copy()
+                fallback_feat["properties"]["tile_coords"] = [tc] if not isinstance(tc, list) else tc
+                merged_features.append(fallback_feat)
 
         return merged_features
 
@@ -711,6 +846,7 @@ class CadastralSegmentationPipeline:
                     logger.error(f"Failed to read cache at {cp}: {e}. Proceeding with live inference.")
 
         features: list[dict] = []
+        tile_stats = {}
 
         if not os.path.exists(geotiff_path):
             raise FileNotFoundError(f"Source GeoTIFF not found at: {geotiff_path}")
@@ -743,6 +879,15 @@ class CadastralSegmentationPipeline:
                 for x in range(0, width, stride):
                     w_win = min(chunk_size, width - x)
                     window = Window(x, y, w_win, h_win)
+                    
+                    tile_key = (x, y)
+                    tile_stats[tile_key] = {
+                        "raw_mask_count": 0,
+                        "polygons_after_mask_to_polygons": 0,
+                        "polygons_after_filter": 0,
+                        "polygons_after_merge": 0,
+                        "polygons_after_nms": 0,
+                    }
 
                     # Read chunk raster bands
                     tile_data = src.read(window=window)
@@ -754,6 +899,10 @@ class CadastralSegmentationPipeline:
                     if not isinstance(tile_masks, list):
                         tile_masks = [tile_masks]
 
+                    # 2. Confirm masks are generated per-tile BEFORE any filtering
+                    logger.info(f"Tile ({x},{y}) size={w_win}x{h_win}: {len(tile_masks)} raw masks generated, mask pixel sums: {[int(m.sum()) for m in tile_masks[:10]]}")
+                    tile_stats[tile_key]["raw_mask_count"] = len(tile_masks)
+
                     # Local-to-CRS transform for this window
                     window_transform = src.window_transform(window)
 
@@ -763,9 +912,14 @@ class CadastralSegmentationPipeline:
                     for mask in tile_masks:
                         # Extract polygons in native CRS space (using min_area=1000.0 pixel area)
                         crs_polygons = self.mask_to_polygons(mask, window_transform, min_area=1000.0)
+                        tile_stats[tile_key]["polygons_after_mask_to_polygons"] += len(crs_polygons)
 
+                        tile_h, tile_w = mask.shape
                         for crs_poly in crs_polygons:
                             local_poly = self._transform_polygon(crs_poly, inv_transform)
+
+                            # 6. Coordinate transform sanity check (bounds relative to tile size)
+                            logger.info(f"Local polygon bounds after transform: {local_poly.bounds} (expected roughly within [0, 0, {tile_w}, {tile_h}])")
 
                             # Define bounding box for local mask crop
                             min_x, min_y, max_x, max_y = local_poly.bounds
@@ -777,7 +931,6 @@ class CadastralSegmentationPipeline:
                             )
 
                             # Discard full-tile background segments (touching all borders)
-                            tile_h, tile_w = mask.shape
                             if (max_x - min_x) >= (tile_w - 2) and (max_y - min_y) >= (tile_h - 2):
                                 continue
 
@@ -799,10 +952,15 @@ class CadastralSegmentationPipeline:
                             # Compute explainable confidence score
                             confidence_score, breakdown = self.compute_confidence(mask_crop, local_poly)
 
+                            # 5. Log breakdown for EVERY candidate
+                            logger.info(f"Candidate polygon breakdown: {breakdown}")
+
                             # Discard highly organic/irregular shapes like trees and shadow noise
                             if breakdown["regularity"] < self.min_regularity or breakdown["compactness"] < self.min_compactness:
+                                logger.info(f"REJECTED: regularity={breakdown['regularity']} < {self.min_regularity} or compactness={breakdown['compactness']} < {self.min_compactness}. Full breakdown: {breakdown}")
                                 continue
 
+                            tile_stats[tile_key]["polygons_after_filter"] += 1
                             # Compile metric feature
                             features.append({
                                 "geometry": crs_poly,
@@ -811,14 +969,56 @@ class CadastralSegmentationPipeline:
                                     "confidence_breakdown": breakdown,
                                     "model_version": self.model_version,
                                     "weights_hash": self.weights_hash,
+                                    "tile_coords": (x, y),
                                 }
                             })
+
+        # Stage 1: Before Merge
+        total_area_before_merge = sum(feat["geometry"].area for feat in features)
+        logger.info(f"STAGE 1: Collected {len(features)} polygons before merge. Total Area: {total_area_before_merge:.2f}")
 
         # Merge overlapping and touching segments in metric CRS space (bridging 1.2m gaps)
         merged = self._merge_overlapping_polygons(features, buffer_dist=1.2)
 
+        # Stage 2: After Merge
+        total_area_after_merge = sum(feat["geometry"].area for feat in merged)
+        logger.info(f"STAGE 2: {len(merged)} polygons remaining after merge. Total Area: {total_area_after_merge:.2f}")
+
+        # Count polygons after merge per tile
+        for feat in merged:
+            tc_list = feat["properties"].get("tile_coords", [])
+            for tc in tc_list:
+                tc = tuple(tc)
+                if tc in tile_stats:
+                    tile_stats[tc]["polygons_after_merge"] += 1
+
         # De-duplicate remaining boundaries via Spatial NMS
         deduplicated = self._polygon_nms(merged, iou_threshold=0.40)
+
+        # Stage 3: After NMS
+        total_area_after_nms = sum(feat["geometry"].area for feat in deduplicated)
+        logger.info(f"STAGE 3: {len(deduplicated)} polygons remaining after NMS. Total Area: {total_area_after_nms:.2f}")
+
+        # Count polygons after NMS per tile
+        for feat in deduplicated:
+            tc_list = feat["properties"].get("tile_coords", [])
+            for tc in tc_list:
+                tc = tuple(tc)
+                if tc in tile_stats:
+                    tile_stats[tc]["polygons_after_nms"] += 1
+
+        # Print final stage-by-stage summary table
+        logger.info("==========================================================================")
+        logger.info("PER-TILE SEGMENTATION STAGE-BY-STAGE PROGRESSION SUMMARY TABLE")
+        logger.info("==========================================================================")
+        logger.info("Tile Coordinate | Raw Masks | Mask to Polys | Filtered | Merged | Final NMS")
+        logger.info("--------------------------------------------------------------------------")
+        for tc, stats in sorted(tile_stats.items()):
+            logger.info(
+                f"({tc[0]:4d}, {tc[1]:4d})  | {stats['raw_mask_count']:9d} | {stats['polygons_after_mask_to_polygons']:13d} | "
+                f"{stats['polygons_after_filter']:8d} | {stats['polygons_after_merge']:6d} | {stats['polygons_after_nms']:9d}"
+            )
+        logger.info("==========================================================================")
 
         # Convert final polygons to WGS84 GeoJSON features
         geojson_features = []
@@ -856,6 +1056,112 @@ class CadastralSegmentationPipeline:
                 "model_version": self.model_version
             }
         }
+
+
+def segment_with_roboflow(
+    image_input: Union[str, np.ndarray],
+    api_key: str = "Z1p45q88sPkLrUdN289r",
+    workspace: str = "ragul-wwpql",
+    workflow_id: str = "map-aoz8d",
+    save_visual_path: Optional[str] = "roboflow_visualized.png"
+) -> list[dict]:
+    """
+    Integrates Roboflow workflow inference into Python:
+    1. Takes an image (file path string or numpy array) as input.
+    2. Sends it to the Roboflow model's workflows API.
+    3. Returns the detected polygons (buildings, houses, roads, bridges) with coordinates and confidence scores.
+    4. Draws these polygons back onto the image and saves the visualized result.
+    """
+    # 1. Parse image input
+    if isinstance(image_input, str):
+        if not os.path.exists(image_input):
+            raise FileNotFoundError(f"Input image path does not exist: {image_input}")
+        img = cv2.imread(image_input)
+        if img is None:
+            raise ValueError(f"Failed to load image from path: {image_input}")
+    elif isinstance(image_input, np.ndarray):
+        img = image_input.copy()
+    else:
+        raise TypeError("image_input must be a file path string or numpy ndarray")
+
+    h, w = img.shape[:2]
+
+    # 2. Encode to base64
+    _, buffer = cv2.imencode('.jpg', img)
+    base64_image = base64.b64encode(buffer).decode('utf-8')
+
+    # 3. Post to API
+    url = f"https://serverless.roboflow.com/infer/workflows/{workspace}/{workflow_id}"
+    payload = {
+        "api_key": api_key,
+        "inputs": {
+            "image": {
+                "type": "base64",
+                "value": base64_image
+            }
+        }
+    }
+
+    logger.info(f"Sending Roboflow inference request to workflow: {workflow_id}...")
+    response = requests.post(url, json=payload)
+    
+    # Error handling for failed API calls
+    if response.status_code != 200:
+        logger.error(f"Roboflow API call failed with status code {response.status_code}: {response.text}")
+        raise RuntimeError(f"Roboflow API error: {response.text}")
+
+    res_json = response.json()
+    outputs = res_json.get("outputs", [])
+    if not outputs:
+        logger.warning("Roboflow response contains no outputs block.")
+        return []
+
+    predictions = outputs[0].get("predictions", {}).get("predictions", [])
+    parsed_polygons = []
+
+    # Map classes to unique BGR colors for visualization
+    class_colors = {
+        "building": (0, 255, 0),    # Green
+        "house": (0, 255, 255),     # Yellow
+        "road": (255, 0, 0),        # Blue
+        "bridge": (255, 0, 255)     # Magenta
+    }
+    default_color = (0, 0, 255)     # Red (fallback)
+
+    # 4. Process predictions and draw polygons
+    for pred in predictions:
+        class_name = pred.get("class", "unknown").lower()
+        confidence = pred.get("confidence", 0.0)
+        pts = pred.get("points", [])
+        if not pts:
+            continue
+
+        # Format points as tuple list: [(x, y), ...]
+        polygon_coords = [(float(p["x"]), float(p["y"])) for p in pts]
+        parsed_polygons.append({
+            "class": class_name,
+            "confidence": float(confidence),
+            "points": polygon_coords
+        })
+
+        # Draw outline on image
+        poly_pts = np.array([[int(p[0]), int(p[1])] for p in polygon_coords], dtype=np.int32)
+        color = class_colors.get(class_name, default_color)
+        
+        cv2.polylines(img, [poly_pts], isClosed=True, color=color, thickness=2)
+        
+        # Add label and confidence text
+        label_text = f"{class_name} ({confidence*100:.1f}%)" if confidence <= 1.0 else f"{class_name} ({confidence:.1f}%)"
+        if len(poly_pts) > 0:
+            text_pos = (poly_pts[0][0], max(15, poly_pts[0][1] - 5))
+            cv2.putText(img, label_text, text_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1, cv2.LINE_AA)
+
+    # Save visualization if path is specified
+    if save_visual_path:
+        cv2.imwrite(save_visual_path, img)
+        logger.info(f"Saved visual overlay output to: {save_visual_path}")
+
+    return parsed_polygons
 
 
 if __name__ == "__main__":
