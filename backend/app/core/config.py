@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: Literal["development", "staging", "production"] = "development"
     DEBUG: bool = True
     SECRET_KEY: str = "INSECURE_CHANGE_ME_IN_PRODUCTION"
+    PROCESSING_CRS: int = 32644
 
     # ── Database ──────────────────────────────────────────────────────────────
     # Default: in-process SQLite for local development.
