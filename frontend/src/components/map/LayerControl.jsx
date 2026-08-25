@@ -13,9 +13,9 @@ export function LayerControl() {
   ];
 
   return (
-    <div className="bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-pastel-border shadow-pastel-md text-pastel-text space-y-3">
-      <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-pastel-muted border-b border-pastel-border pb-2">
-        <Layers className="w-4 h-4 text-pastel-action" />
+    <div className="cv-panel-elevated space-y-3 rounded-2xl p-4 text-pastel-text transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(1,28,64,0.12)]">
+      <div className="flex items-center space-x-2 border-b border-[#C9E5EE] pb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#4F7285]">
+        <Layers className="h-4 w-4 text-[#266580]" />
         <span>Layer Explorer</span>
       </div>
 
@@ -25,19 +25,21 @@ export function LayerControl() {
           return (
             <label
               key={item.key}
-              className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-all text-xs font-medium ${
-                isActive ? 'bg-pastel-lavender/60 text-pastel-text border border-pastel-border' : 'hover:bg-pastel-surface-soft text-pastel-muted'
+              className={`flex cursor-pointer items-center justify-between rounded-xl p-2.5 text-xs font-medium transition-all duration-200 ${
+                isActive
+                  ? 'border border-[#A7EBF2] bg-[linear-gradient(135deg,rgba(167,235,242,0.22),rgba(84,172,191,0.08))] text-[#011C40] shadow-[0_8px_20px_rgba(2,56,89,0.06)]'
+                  : 'text-[#4F7285] hover:border hover:border-[#A7EBF2]/60 hover:bg-[linear-gradient(135deg,rgba(167,235,242,0.14),rgba(84,172,191,0.04))]'
               }`}
             >
               <div className="flex items-center space-x-2.5">
-                <span className={`w-2.5 h-2.5 rounded-full ${item.badgeColor}`} />
+                <span className={`h-2.5 w-2.5 rounded-full ${item.badgeColor}`} />
                 <span>{item.label}</span>
               </div>
               <input
                 type="checkbox"
                 checked={isActive}
                 onChange={() => toggleLayer(item.key)}
-                className="rounded border-pastel-border text-pastel-action focus:ring-pastel-action"
+                className="rounded border-[#C9E5EE] text-[#266580] focus:ring-[#54ACBF]"
               />
             </label>
           );
