@@ -8,6 +8,8 @@ import {
   Layers,
   Map,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
   X,
 } from 'lucide-react';
 
@@ -20,13 +22,13 @@ const workspaces = [
   { label: 'Cadastral Reports', detail: 'Generate reports', path: '/reports', icon: FileText },
 ];
 
-export function WorkspaceRail({ isOpen, onClose }) {
+export function WorkspaceRail({ isOpen, collapsed, onToggleCollapse, onClose }) {
   const location = useLocation();
 
   return (
-    <aside className={`cv-workspace-rail ${isOpen ? 'is-open' : ''}`} aria-label="Workspace navigation">
+    <aside className={`cv-workspace-rail ${isOpen ? 'is-open' : ''} ${collapsed ? 'is-collapsed' : ''}`} aria-label="Workspace navigation">
       <div className="border-b border-white/10 px-5 py-5 lg:px-6">
-        <div className="flex items-center gap-3">
+        <div className="cv-workspace-brand flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#A7EBF2] text-[#011C40]">
             <Layers className="h-5 w-5" />
           </div>
@@ -35,7 +37,7 @@ export function WorkspaceRail({ isOpen, onClose }) {
             <p className="mt-1 text-[10px] text-white/45">Bengaluru East / Sector 4</p>
           </div>
         </div>
-        <div className="mt-5 flex items-center justify-between">
+        <div className="cv-workspace-heading mt-5 flex items-center justify-between">
           <div>
             <p className="cv-kicker text-[#D4C7A1]">Workspaces</p>
             <p className="mt-1 text-xs text-white/45">Spatial operations</p>
@@ -46,7 +48,17 @@ export function WorkspaceRail({ isOpen, onClose }) {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-5" aria-label="CadastraVision workspaces">
+      <button
+        type="button"
+        onClick={onToggleCollapse}
+        className="cv-sidebar-toggle"
+        aria-label={collapsed ? 'Expand workspace sidebar' : 'Collapse workspace sidebar'}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+      </button>
+
+      <nav className="cv-workspace-nav flex-1 space-y-1.5 overflow-y-auto px-3 py-5" aria-label="CadastraVision workspaces">
         {workspaces.map(({ label, detail, path, icon: Icon }) => {
           const active = location.pathname === path;
           return (
@@ -58,7 +70,7 @@ export function WorkspaceRail({ isOpen, onClose }) {
               aria-current={active ? 'page' : undefined}
             >
               <span className="cv-workspace-icon"><Icon className="h-4 w-4" /></span>
-              <span className="min-w-0">
+              <span className="cv-workspace-copy min-w-0">
                 <span className="block truncate text-[11px] font-bold tracking-wide">{label}</span>
                 <span className="mt-0.5 block truncate text-[10px] text-white/40">{detail}</span>
               </span>
@@ -68,7 +80,7 @@ export function WorkspaceRail({ isOpen, onClose }) {
         })}
       </nav>
 
-      <div className="border-t border-white/10 p-4">
+      <div className="cv-workspace-project border-t border-white/10 p-4">
         <div className="rounded-xl border border-[#54ACBF]/25 bg-[#023859]/50 p-3">
           <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#A7EBF2]">
             <Layers className="h-3.5 w-3.5" />

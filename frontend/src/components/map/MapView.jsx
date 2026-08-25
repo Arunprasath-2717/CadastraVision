@@ -13,8 +13,13 @@ export function MapView() {
     selectParcel,
     setMapInstance
   } = useMapSelection();
+  const selectParcelRef = useRef(selectParcel);
 
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    selectParcelRef.current = selectParcel;
+  }, [selectParcel]);
 
   // Free OpenAccess Dark / Carto Vector style
   const basemapStyle = {
@@ -159,7 +164,7 @@ export function MapView() {
       map.on('click', 'parcels-fill-layer', (e) => {
         if (e.features && e.features.length > 0) {
           const parcelId = e.features[0].properties.id;
-          selectParcel(parcelId, false);
+          selectParcelRef.current(parcelId, false);
         }
       });
 
@@ -178,7 +183,7 @@ export function MapView() {
       map.remove();
       mapRef.current = null;
     };
-  }, [selectParcel, setMapInstance]);
+  }, [setMapInstance]);
 
   // Update Layer Visibility dynamically
   useEffect(() => {

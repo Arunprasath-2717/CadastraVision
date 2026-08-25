@@ -5,8 +5,9 @@
  */
 
 const DB_NAME = 'cadastralmap_offline_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'pending_actions';
+const MOCK_STORE = 'mock_state';
 
 /**
  * Open or initialize IndexedDB database
@@ -26,6 +27,9 @@ function openDB() {
       const db = event.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'client_action_id' });
+      }
+      if (!db.objectStoreNames.contains(MOCK_STORE)) {
+        db.createObjectStore(MOCK_STORE, { keyPath: 'parcel_id' });
       }
     };
 
@@ -108,6 +112,47 @@ export async function getPendingActions() {
 }
 
 /**
+ * Save successfully applied mock edit to persistent mock state
+ */
+export async function savePersistentMockState(parcelId, action) {
+  const db = await openDB();
+  if (!db) return;
+
+  const record = {
+    parcel_id: parcelId,
+    action_type: action.type || action.action_type,
+    payload: action.payload || {},
+    timestamp: action.timestamp || new Date().toISOString()
+  };
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(MOCK_STORE, 'readwrite');
+    const store = tx.objectStore(MOCK_STORE);
+    const req = store.put(record);
+
+    req.onsuccess = () => resolve(true);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+/**
+ * Get all persistent mock state edits
+ */
+export async function getPersistentMockState() {
+  const db = await openDB();
+  if (!db) return [];
+
+  return new Promise((resolve) => {
+    const tx = db.transaction(MOCK_STORE, 'readonly');
+    const store = tx.objectStore(MOCK_STORE);
+    const req = store.getAll();
+
+    req.onsuccess = () => resolve(req.result || []);
+    req.onerror = () => resolve([]);
+  });
+}
+
+/**
  * Remove a specific queued offline action
  * @param {string} client_action_id
  */
@@ -160,6 +205,9 @@ export async function syncOfflineQueue(apiClient) {
       for (const action of actions) {
         try {
           parcelApi.applyMockAction(action);
+          // Persist the successfully applied mock edit
+          await savePersistentMockState(action.parcel_id, action);
+          // Remove the specific action only after persistence
           await removeOfflineAction(action.client_action_id);
         } catch (e) {
           console.error('Failed to apply mock action', e);

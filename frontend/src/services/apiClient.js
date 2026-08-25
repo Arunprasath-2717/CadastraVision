@@ -13,6 +13,10 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA !== 'false';
  * @param {RequestInit} [options] 
  */
 export async function apiRequest(endpoint, options = {}) {
+  if (!navigator.onLine && USE_MOCK) {
+    return null;
+  }
+
   const token = localStorage.getItem('cadastral_jwt');
   const isValidJwtFormat = token && typeof token === 'string' && token.includes('.') && token.split('.').length === 3;
   const headers = {

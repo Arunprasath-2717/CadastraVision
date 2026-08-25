@@ -1,30 +1,36 @@
 import { apiRequest } from './apiClient';
+import { geoApi } from './geoApi';
 import mockParcelsData from '../mocks/parcels.json';
-import { enqueueOfflineAction, getPendingActions } from '../lib/offlineQueue';
+import { enqueueOfflineAction, getPendingActions, savePersistentMockState, getPersistentMockState } from '../lib/offlineQueue';
 
 // Local reactive mock memory state for demo editing / approval persistence
 let localParcels = JSON.parse(JSON.stringify(mockParcelsData.features));
 
-let isMockRestored = false;
-let restorePromise = null;
+let mockStateReady = null;
 
-async function ensureMockStateRestored() {
-  if (isMockRestored) return;
-  if (!restorePromise) {
-    restorePromise = (async () => {
+async function initializeMockState() {
+  if (!mockStateReady) {
+    mockStateReady = (async () => {
       try {
+        // Step 1: Baseline mock JSON is already in localParcels
+
+        // Step 2: Read persistent mock state from IndexedDB
+        const persistentEdits = await getPersistentMockState();
+        for (const edit of persistentEdits) {
+          parcelApi.applyMockAction(edit);
+        }
+
+        // Step 3: Read pending offline actions from IndexedDB
         const pendingActions = await getPendingActions();
         for (const action of pendingActions) {
           parcelApi.applyMockAction(action);
         }
       } catch (err) {
-        console.error('Failed to restore mock state from IndexedDB', err);
-      } finally {
-        isMockRestored = true;
+        console.error('Failed to initialize mock state from IndexedDB', err);
       }
     })();
   }
-  return restorePromise;
+  return mockStateReady;
 }
 
 /**
@@ -35,7 +41,7 @@ export const parcelApi = {
    * Get paginated parcel records
    */
   async getParcels(filters = {}) {
-    await ensureMockStateRestored();
+    await initializeMockState();
     const query = new URLSearchParams(filters).toString();
     const res = await apiRequest(`/v1/parcels?${query}`);
     if (res && res.items) return res;
@@ -60,7 +66,7 @@ export const parcelApi = {
    * Get single parcel details
    */
   async getParcelById(parcelId) {
-    await ensureMockStateRestored();
+    await initializeMockState();
     const res = await apiRequest(`/v1/parcels/${parcelId}`);
     if (res) return res;
 
@@ -79,7 +85,7 @@ export const parcelApi = {
    * Triggers automatic server re-validation
    */
   async editParcel(parcelId, newGeometry, actionType = 'vertex_edit') {
-    await ensureMockStateRestored();
+    await initializeMockState();
     const payload = {
       idempotency_key: `edit-${parcelId}-${Date.now()}`,
       edit: {
@@ -106,8 +112,22 @@ export const parcelApi = {
       localParcels[featureIdx].properties.last_updated = new Date().toISOString();
       localParcels[featureIdx].properties.updated_by = 'Muthulakshmi S. (Surveyor)';
       
+      const mockIdx = mockParcelsData.features.findIndex(f => f.properties.id === parcelId || f.id === parcelId);
+      if (mockIdx !== -1) {
+        mockParcelsData.features[mockIdx].geometry = newGeometry;
+        mockParcelsData.features[mockIdx].properties.source = 'human-edited';
+        mockParcelsData.features[mockIdx].properties.confidence_score = 0.96;
+        mockParcelsData.features[mockIdx].properties.confidence_band = 'HIGH';
+        mockParcelsData.features[mockIdx].properties.last_updated = new Date().toISOString();
+        mockParcelsData.features[mockIdx].properties.updated_by = 'Muthulakshmi S. (Surveyor)';
+      }
+
       if (!navigator.onLine) {
+        // Enqueue offline action (pending = 1)
         await enqueueOfflineAction({ type: actionType, parcel_id: parcelId, payload: { geometry: newGeometry } });
+      } else {
+        // Persist immediately into mock_state (pending remains 0)
+        await savePersistentMockState(parcelId, { type: actionType, payload: { geometry: newGeometry } });
       }
     }
 
@@ -129,7 +149,7 @@ export const parcelApi = {
    * Explicit Human Approval (PRD Non-Negotiable R1)
    */
   async approveParcel(parcelId, notes = 'Boundary validated and approved') {
-    await ensureMockStateRestored();
+    await initializeMockState();
     const payload = { notes };
 
     const res = await apiRequest(`/v1/parcels/${parcelId}/approve`, {
@@ -146,6 +166,8 @@ export const parcelApi = {
       
       if (!navigator.onLine) {
         await enqueueOfflineAction({ type: 'approve', parcel_id: parcelId, payload: { notes } });
+      } else {
+        await savePersistentMockState(parcelId, { type: 'approve', payload: { notes } });
       }
     }
 
@@ -162,7 +184,7 @@ export const parcelApi = {
    * Explicit Human Rejection
    */
   async rejectParcel(parcelId, reason = 'Boundary error') {
-    await ensureMockStateRestored();
+    await initializeMockState();
     const payload = { reason };
 
     const res = await apiRequest(`/v1/parcels/${parcelId}/reject`, {
@@ -178,6 +200,8 @@ export const parcelApi = {
       
       if (!navigator.onLine) {
         await enqueueOfflineAction({ type: 'reject', parcel_id: parcelId, payload: { reason } });
+      } else {
+        await savePersistentMockState(parcelId, { type: 'reject', payload: { reason } });
       }
     }
 
@@ -197,20 +221,51 @@ export const parcelApi = {
     const featureIdx = localParcels.findIndex(f => f.properties.id === action.parcel_id || f.id === action.parcel_id);
     if (featureIdx === -1) return false;
     
+    const mockIdx = mockParcelsData.features.findIndex(f => f.properties.id === action.parcel_id || f.id === action.parcel_id);
+
     if (action.action_type === 'approve') {
       localParcels[featureIdx].properties.validation_status = 'approved';
       localParcels[featureIdx].properties.flags = [];
+      if (mockIdx !== -1) {
+        mockParcelsData.features[mockIdx].properties.validation_status = 'approved';
+        mockParcelsData.features[mockIdx].properties.flags = [];
+      }
     } else if (action.action_type === 'reject') {
       localParcels[featureIdx].properties.validation_status = 'rejected';
+      if (mockIdx !== -1) {
+        mockParcelsData.features[mockIdx].properties.validation_status = 'rejected';
+      }
     } else {
       // assume edit
-      localParcels[featureIdx].geometry = action.payload.geometry || localParcels[featureIdx].geometry;
+      localParcels[featureIdx].geometry = action.payload?.geometry || localParcels[featureIdx].geometry;
       localParcels[featureIdx].properties.source = 'human-edited';
       localParcels[featureIdx].properties.confidence_score = 0.96;
       localParcels[featureIdx].properties.confidence_band = 'HIGH';
       localParcels[featureIdx].properties.last_updated = action.timestamp || new Date().toISOString();
       localParcels[featureIdx].properties.updated_by = 'Muthulakshmi S. (Surveyor)';
+      
+      if (mockIdx !== -1) {
+        mockParcelsData.features[mockIdx].geometry = action.payload?.geometry || mockParcelsData.features[mockIdx].geometry;
+        mockParcelsData.features[mockIdx].properties.source = 'human-edited';
+        mockParcelsData.features[mockIdx].properties.confidence_score = 0.96;
+        mockParcelsData.features[mockIdx].properties.confidence_band = 'HIGH';
+        mockParcelsData.features[mockIdx].properties.last_updated = action.timestamp || new Date().toISOString();
+        mockParcelsData.features[mockIdx].properties.updated_by = 'Muthulakshmi S. (Surveyor)';
+      }
     }
     return true;
   }
 };
+
+// Monkey-patch geoApi to ensure map loading waits for offline IDB restoration
+if (geoApi && typeof geoApi.getParcelGeoJSON === 'function' && !geoApi.__patched) {
+  const origGetParcelGeoJSON = geoApi.getParcelGeoJSON;
+  geoApi.getParcelGeoJSON = async function(...args) {
+    await initializeMockState();
+    return origGetParcelGeoJSON.apply(this, args);
+  };
+  geoApi.__patched = true;
+}
+
+// Kick off initialization immediately to minimize race conditions with map layer loads
+initializeMockState().catch(console.error);
