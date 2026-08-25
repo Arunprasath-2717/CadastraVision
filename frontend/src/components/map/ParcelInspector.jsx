@@ -24,10 +24,23 @@ export function ParcelInspector() {
 
   if (!selectedParcel) {
     return (
-      <div className="bg-white/95 backdrop-blur-md p-6 rounded-2xl border border-pastel-border shadow-pastel-md text-center text-pastel-muted text-xs flex flex-col justify-center h-full">
-        <Layers className="w-8 h-8 mx-auto mb-2 text-pastel-subtle animate-pulse" />
-        <p className="font-semibold text-pastel-text">No Parcel Selected</p>
-        <p className="mt-1 max-w-xs mx-auto">Click a parcel boundary on the map or select an item from the Review Queue to inspect details.</p>
+      <div className="bg-white/95 backdrop-blur-md p-6 rounded-2xl border border-pastel-border shadow-pastel-md text-center text-pastel-muted text-xs flex flex-col items-center justify-center h-full space-y-3">
+        <div className="w-12 h-12 rounded-2xl bg-pastel-lavender flex items-center justify-center text-pastel-action shadow-pastel-sm animate-bounce">
+          <Layers className="w-6 h-6" />
+        </div>
+        <div>
+          <p className="font-bold text-sm text-pastel-text font-display uppercase tracking-wider">NO PARCEL SELECTED</p>
+          <p className="mt-1 text-xs text-pastel-muted max-w-xs mx-auto leading-relaxed">
+            Select a parcel on the map or choose an item from the Review Queue to inspect cadastral details.
+          </p>
+        </div>
+        <button
+          onClick={() => selectParcel('P-1024', true)}
+          className="mt-2 px-3.5 py-2 bg-pastel-lavender hover:bg-pastel-action hover:text-white text-pastel-action font-semibold text-xs rounded-xl border border-pastel-border shadow-pastel-sm transition-all duration-200 flex items-center space-x-1.5"
+        >
+          <ShieldCheck className="w-3.5 h-3.5" />
+          <span>Inspect Sample P-1024</span>
+        </button>
       </div>
     );
   }

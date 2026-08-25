@@ -211,46 +211,56 @@ export function MapView() {
   }, [selectedParcelId]);
 
   return (
-    <div className="relative w-full h-full min-h-[400px] overflow-hidden rounded-2xl border border-pastel-border bg-white shadow-pastel-md">
+    <div className="relative h-full w-full min-h-[400px] overflow-hidden rounded-[21px] border border-[#54ACBF]/30 bg-[radial-gradient(circle_at_top_left,rgba(167,235,242,0.20),transparent_22%),linear-gradient(180deg,#0b2d4a,#011c40)] shadow-[inset_0_0_0_1px_rgba(167,235,242,0.14)]">
       {loading && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/80 backdrop-blur-sm text-pastel-text">
-          <div className="flex items-center space-x-3 text-sm font-medium">
-            <Loader2 className="w-5 h-5 animate-spin text-pastel-action" />
-            <span>Loading MapLibre Web-GIS Vector Layers...</span>
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(2,56,89,0.78),rgba(1,28,64,0.92))] backdrop-blur-sm text-white">
+          <div className="flex items-center gap-3 rounded-2xl border border-[#A7EBF2]/30 bg-white/5 px-4 py-3 shadow-[0_12px_30px_rgba(1,28,64,0.2)]">
+            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-[linear-gradient(135deg,rgba(167,235,242,0.18),rgba(84,172,191,0.08))]">
+              <Loader2 className="h-5 w-5 animate-spin text-[#A7EBF2]" />
+              <span className="absolute inset-0 rounded-xl border border-[#A7EBF2]/40 animate-pulse" />
+            </div>
+            <div className="space-y-1.5">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#A7EBF2]">Loading spatial layers</div>
+              <div className="h-1.5 w-40 overflow-hidden rounded-full bg-white/10">
+                <div className="h-full w-2/3 rounded-full bg-[linear-gradient(90deg,#A7EBF2,#54ACBF,#266580)] animate-pulse" />
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* MapLibre DOM Container */}
-      <div ref={mapContainerRef} className="w-full h-full" />
+      <div ref={mapContainerRef} className="h-full w-full" />
 
-      {/* Accessible Floating Map Controls Overlay */}
-      <div className="absolute top-4 right-4 z-10 flex flex-col space-y-2">
+      <div className="absolute left-4 top-4 z-10 rounded-xl border border-[#A7EBF2]/35 bg-[rgba(1,28,64,0.58)] px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-[0.2em] text-[#D7F7FF] shadow-[0_12px_24px_rgba(1,28,64,0.18)] backdrop-blur-md">
+        Sector 4 • Live GIS
+      </div>
+
+      <div className="absolute right-4 top-4 z-10 flex flex-col space-y-2">
         <button
           onClick={() => mapRef.current?.zoomIn()}
           title="Zoom In"
           aria-label="Zoom In"
-          className="p-2.5 bg-white/95 backdrop-blur-md rounded-xl border border-pastel-border text-pastel-text hover:bg-pastel-surface-soft hover:text-pastel-action transition-all shadow-pastel-sm"
+          className="rounded-xl border border-[#A7EBF2]/30 bg-[rgba(247,252,254,0.9)] p-2.5 text-[#011C40] shadow-[0_10px_22px_rgba(1,28,64,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#54ACBF] hover:text-[#023859]"
         >
-          <ZoomIn className="w-4 h-4" />
+          <ZoomIn className="h-4 w-4" />
         </button>
 
         <button
           onClick={() => mapRef.current?.zoomOut()}
           title="Zoom Out"
           aria-label="Zoom Out"
-          className="p-2.5 bg-white/95 backdrop-blur-md rounded-xl border border-pastel-border text-pastel-text hover:bg-pastel-surface-soft hover:text-pastel-action transition-all shadow-pastel-sm"
+          className="rounded-xl border border-[#A7EBF2]/30 bg-[rgba(247,252,254,0.9)] p-2.5 text-[#011C40] shadow-[0_10px_22px_rgba(1,28,64,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#54ACBF] hover:text-[#023859]"
         >
-          <ZoomOut className="w-4 h-4" />
+          <ZoomOut className="h-4 w-4" />
         </button>
 
         <button
           onClick={() => mapRef.current?.resetNorthPitch()}
           title="Reset Orientation"
           aria-label="Reset Orientation"
-          className="p-2.5 bg-white/95 backdrop-blur-md rounded-xl border border-pastel-border text-pastel-text hover:bg-pastel-surface-soft hover:text-pastel-action transition-all shadow-pastel-sm"
+          className="rounded-xl border border-[#A7EBF2]/30 bg-[rgba(247,252,254,0.9)] p-2.5 text-[#011C40] shadow-[0_10px_22px_rgba(1,28,64,0.1)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#54ACBF] hover:text-[#023859]"
         >
-          <Compass className="w-4 h-4" />
+          <Compass className="h-4 w-4" />
         </button>
       </div>
     </div>
