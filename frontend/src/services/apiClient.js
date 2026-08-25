@@ -14,10 +14,11 @@ const USE_MOCK = import.meta.env.VITE_USE_MOCK_DATA !== 'false';
  */
 export async function apiRequest(endpoint, options = {}) {
   const token = localStorage.getItem('cadastral_jwt');
+  const isValidJwtFormat = token && typeof token === 'string' && token.includes('.') && token.split('.').length === 3;
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...(isValidJwtFormat ? { 'Authorization': `Bearer ${token}` } : {}),
     ...options.headers,
   };
 
@@ -27,6 +28,10 @@ export async function apiRequest(endpoint, options = {}) {
     const response = await fetch(url, { ...options, headers });
     
     if (!response.ok) {
+      if (USE_MOCK) {
+        console.warn(`[API Client] Real endpoint ${endpoint} returned HTTP ${response.status}. Falling back to Mock Fixture.`);
+        return null;
+      }
       const errorBody = await response.json().catch(() => ({}));
       throw {
         status: response.status,
@@ -38,7 +43,6 @@ export async function apiRequest(endpoint, options = {}) {
     return await response.json();
   } catch (err) {
     if (USE_MOCK) {
-      // In mock mode, log warning & let service fallback to local fixtures
       console.warn(`[API Client] Real endpoint ${endpoint} unreachable. Falling back to Mock Fixture.`);
       return null;
     }
