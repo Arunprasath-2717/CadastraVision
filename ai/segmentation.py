@@ -115,14 +115,29 @@ class CadastralSegmentationPipeline:
                     self.model_version = "samgeo-fastsam-s"
                     weights_file = os.path.abspath(weights_name)
                 except Exception as ex:
-                    logger.warning(f"Failed to load samgeo.fast_sam: {ex}. Falling back to standard vit_b.")
                     from samgeo import SamGeo
                     # Default to lightweight vit_b to prevent GTX 1650 OOM
                     model_type = "vit_b"
+                    generator_args = {
+                        "pred_iou_thresh": 0.70,
+                        "stability_score_thresh": 0.80,
+                        "min_mask_region_area": 1000,
+                        "crop_n_layers": 1,
+                        "box_nms_thresh": 0.70
+                    }
                     if self.model_path:
-                        self.model = SamGeo(model_type=model_type, checkpoint=self.model_path, device=self.device)
+                        self.model = SamGeo(
+                            model_type=model_type, 
+                            checkpoint=self.model_path, 
+                            device=self.device,
+                            **generator_args
+                        )
                     else:
-                        self.model = SamGeo(model_type=model_type, device=self.device)
+                        self.model = SamGeo(
+                            model_type=model_type, 
+                            device=self.device,
+                            **generator_args
+                        )
                     self.model_version = f"samgeo-{self.model.model_type}"
                     weights_file = os.path.abspath(self.model.checkpoint)
 
@@ -644,10 +659,20 @@ class CadastralSegmentationPipeline:
                 confidences = [parsed_features[idx]["properties"].get("confidence", 0.0) for idx in comp]
                 avg_confidence = round(sum(confidences) / len(confidences), 2)
                 
+                # Merge breakdown dictionaries by average
+                breakdowns = [parsed_features[idx]["properties"].get("confidence_breakdown", {}) for idx in comp]
+                avg_regularity = round(sum(b.get("regularity", 0.0) for b in breakdowns) / len(breakdowns), 2)
+                avg_compactness = round(sum(b.get("compactness", 0.0) for b in breakdowns) / len(breakdowns), 2)
+                avg_breakdown = {
+                    "regularity": avg_regularity,
+                    "compactness": avg_compactness
+                }
+                
                 merged_feat = {
                     "geometry": union_shape,
                     "properties": {
                         "confidence": avg_confidence,
+                        "confidence_breakdown": avg_breakdown,
                         "model_version": parsed_features[comp[0]]["properties"].get("model_version", "unknown"),
                         "weights_hash": parsed_features[comp[0]]["properties"].get("weights_hash", "unknown"),
                     }
@@ -782,6 +807,7 @@ class CadastralSegmentationPipeline:
                                 "geometry": crs_poly,
                                 "properties": {
                                     "confidence": confidence_score,
+                                    "confidence_breakdown": breakdown,
                                     "model_version": self.model_version,
                                     "weights_hash": self.weights_hash,
                                 }
