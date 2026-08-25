@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMapSelection } from '../context/MapContext';
 import { MapView } from '../components/map/MapView';
 import { LayerControl } from '../components/map/LayerControl';
 import { MapLegend } from '../components/map/MapLegend';
@@ -17,17 +18,27 @@ import {
   FileText, 
   BarChart3, 
   Layers,
-  MapPin
+  MapPin,
+  Maximize2,
+  Minimize2
 } from 'lucide-react';
 
 export function DashboardPage() {
   const navigate = useNavigate();
+  const { mapInstance } = useMapSelection();
   const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
+  const [mapMaximized, setMapMaximized] = useState(false);
+
+  useEffect(() => {
+    if (!mapInstance) return;
+    const frame = window.requestAnimationFrame(() => mapInstance.resize());
+    return () => window.cancelAnimationFrame(frame);
+  }, [mapInstance, mapMaximized]);
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(167,235,242,0.28),transparent_18%),linear-gradient(180deg,#effbfe_0%,#eaf8fb_100%)] p-3 lg:p-4">
-      <div className="grid h-full grid-cols-12 gap-3 lg:gap-4">
-        <div className="col-span-12 flex max-h-full flex-col space-y-3 overflow-y-auto lg:col-span-3 lg:space-y-4">
+      <div className="relative grid h-full grid-cols-12 gap-3 lg:gap-4">
+        <div className={`col-span-12 flex max-h-full flex-col space-y-3 overflow-y-auto lg:col-span-3 lg:space-y-4 ${mapMaximized ? 'hidden' : ''}`}>
           <div className="cv-panel-elevated flex shrink-0 items-center justify-between rounded-2xl p-3.5 transition-all duration-200 hover:-translate-y-0.5">
             <div className="flex items-center space-x-2.5">
               <div className="rounded-xl bg-[linear-gradient(135deg,rgba(167,235,242,0.5),rgba(84,172,191,0.2))] p-2 text-[#023859]">
@@ -53,7 +64,7 @@ export function DashboardPage() {
           <MapLegend />
         </div>
 
-        <div id="gis-map-panel" className="col-span-12 flex max-h-full flex-col space-y-3 overflow-hidden lg:col-span-6 lg:space-y-4">
+        <div id="gis-map-panel" className={`col-span-12 flex max-h-full flex-col space-y-3 overflow-hidden lg:col-span-6 lg:space-y-4 ${mapMaximized ? 'cv-map-panel-maximized absolute inset-0 z-30 p-0' : ''}`}>
           <div className="cv-panel-elevated flex shrink-0 items-center justify-between gap-2 overflow-x-auto rounded-2xl p-2 px-3">
             <span className="flex shrink-0 items-center space-x-1 text-[11px] font-bold uppercase tracking-[0.18em] text-[#4F7285] font-mono">
               <MapPin className="h-3 w-3 text-[#266580]" />
@@ -103,14 +114,23 @@ export function DashboardPage() {
             <div className="h-full w-full overflow-hidden rounded-[21px] border border-[#54ACBF]/35 bg-[#011C40]">
               <MapView />
             </div>
+            <button
+              type="button"
+              onClick={() => setMapMaximized((maximized) => !maximized)}
+              className="cv-map-maximize-button"
+              aria-label={mapMaximized ? 'Restore map' : 'Maximize map'}
+              title={mapMaximized ? 'Restore map' : 'Maximize map'}
+            >
+              {mapMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </button>
           </div>
 
-          <div className="h-auto shrink-0">
+          <div className={`h-auto shrink-0 ${mapMaximized ? 'hidden' : ''}`}>
             <ReviewQueue />
           </div>
         </div>
 
-        <div className="col-span-12 flex max-h-full flex-col space-y-3 overflow-y-auto lg:col-span-3 lg:space-y-4">
+        <div className={`col-span-12 flex max-h-full flex-col space-y-3 overflow-y-auto lg:col-span-3 lg:space-y-4 ${mapMaximized ? 'hidden' : ''}`}>
           <div className="min-h-[280px] flex-1">
             <ParcelInspector />
           </div>

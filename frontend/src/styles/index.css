@@ -99,9 +99,68 @@
   background:
     linear-gradient(180deg, #292824 0%, #1E1D1A 100%),
     radial-gradient(circle at 0 0, rgba(169, 184, 154, 0.18), transparent 30%);
-  border-right: 1px solid rgba(255, 248, 232, 0.10);
+  border-right: 1px solid rgba(255, 248, 232, 0.1);
   box-shadow: 18px 0 42px rgba(41, 40, 36, 0.13);
+  position: relative;
+  transition: width 0.28s ease, flex-basis 0.28s ease, transform 0.28s ease;
 }
+
+.cv-workspace-rail.is-collapsed {
+  width: 54px;
+  flex-basis: 54px;
+}
+
+.cv-workspace-rail.is-collapsed .cv-workspace-brand,
+.cv-workspace-rail.is-collapsed .cv-workspace-heading,
+.cv-workspace-rail.is-collapsed .cv-workspace-copy,
+.cv-workspace-rail.is-collapsed .cv-workspace-dot,
+.cv-workspace-rail.is-collapsed .cv-workspace-project {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cv-workspace-rail.is-collapsed .cv-workspace-brand,
+.cv-workspace-rail.is-collapsed .cv-workspace-heading {
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.cv-workspace-rail.is-collapsed .cv-workspace-nav {
+  padding-right: 0.45rem;
+  padding-left: 0.45rem;
+}
+
+.cv-workspace-rail.is-collapsed .cv-workspace-item {
+  justify-content: center;
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.cv-sidebar-toggle {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  right: -12px;
+  display: grid;
+  height: 24px;
+  width: 24px;
+  place-items: center;
+  border: 1px solid rgba(217, 226, 201, 0.45);
+  border-radius: 999px;
+  color: #292824;
+  background: #D9E2C9;
+  box-shadow: 0 5px 14px rgba(41, 40, 36, 0.22);
+  transform: translateY(-50%);
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cv-sidebar-toggle:hover {
+  background: #A9B89A;
+  box-shadow: 0 7px 18px rgba(41, 40, 36, 0.3);
+}
+
+.cv-sidebar-toggle:active { transform: translateY(-50%) scale(0.94); }
 
 .cv-workspace-item {
   position: relative;
@@ -233,6 +292,38 @@
   mask-image: radial-gradient(ellipse at center, black 0%, transparent 68%);
 }
 
+.cv-map-panel-maximized {
+  min-width: 0;
+  transition: inset 0.28s ease;
+}
+
+.cv-map-maximize-button {
+  position: absolute;
+  z-index: 25;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: grid;
+  height: 2.25rem;
+  width: 2.25rem;
+  place-items: center;
+  border: 1px solid rgba(167, 235, 242, 0.4);
+  border-radius: 0.75rem;
+  color: #011C40;
+  background: rgba(247, 252, 254, 0.92);
+  box-shadow: 0 10px 22px rgba(1, 28, 64, 0.18);
+  backdrop-filter: blur(10px);
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cv-map-maximize-button:hover {
+  transform: translateY(-2px);
+  border-color: #54ACBF;
+  background: #D9E2C9;
+  box-shadow: 0 13px 26px rgba(1, 28, 64, 0.24);
+}
+
+.cv-map-maximize-button:active { transform: translateY(0) scale(0.95); }
+
 @media (prefers-reduced-motion: reduce) {
   .cv-status-pill, .cv-status-online .cv-status-dot { animation: none; transition: none; }
 }
@@ -248,12 +339,40 @@
   }
 
   .cv-workspace-rail.is-open { transform: translateX(0); }
+  .cv-workspace-rail.is-collapsed {
+    width: min(286px, 88vw);
+    flex-basis: auto;
+  }
+
+  .cv-workspace-rail.is-collapsed .cv-workspace-brand,
+  .cv-workspace-rail.is-collapsed .cv-workspace-heading,
+  .cv-workspace-rail.is-collapsed .cv-workspace-copy,
+  .cv-workspace-rail.is-collapsed .cv-workspace-dot,
+  .cv-workspace-rail.is-collapsed .cv-workspace-project {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .cv-workspace-rail.is-collapsed .cv-workspace-brand,
+  .cv-workspace-rail.is-collapsed .cv-workspace-heading {
+    height: auto;
+    margin: revert;
+    overflow: visible;
+  }
+
+  .cv-workspace-rail.is-collapsed .cv-workspace-nav { padding-right: 0.75rem; padding-left: 0.75rem; }
+  .cv-workspace-rail.is-collapsed .cv-workspace-item { justify-content: flex-start; padding-right: 0.75rem; padding-left: 0.75rem; }
+
+  .cv-map-panel-maximized { inset: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .cv-workspace-item,
   .cv-workspace-icon,
-  .cv-workspace-rail { transition: none; }
+  .cv-workspace-rail,
+  .cv-sidebar-toggle,
+  .cv-map-panel-maximized,
+  .cv-map-maximize-button { transition: none; }
 }
 
 .cv-surface {

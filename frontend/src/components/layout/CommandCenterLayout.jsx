@@ -9,6 +9,7 @@ import { WorkspaceRail } from './WorkspaceRail';
 export function CommandCenterLayout({ page: PageComponent }) {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <OfflineProvider>
@@ -17,7 +18,12 @@ export function CommandCenterLayout({ page: PageComponent }) {
           <NavigationHeader onOpenProfile={() => setIsProfileOpen(true)} onOpenWorkspace={() => setIsWorkspaceOpen(true)} />
 
           <div className="flex min-h-0 flex-1">
-            <WorkspaceRail isOpen={isWorkspaceOpen} onClose={() => setIsWorkspaceOpen(false)} />
+            <WorkspaceRail
+              isOpen={isWorkspaceOpen}
+              collapsed={sidebarCollapsed}
+              onToggleCollapse={() => setSidebarCollapsed((collapsed) => !collapsed)}
+              onClose={() => setIsWorkspaceOpen(false)}
+            />
             <main className="cv-main-surface relative flex min-w-0 flex-1 flex-col overflow-hidden">
               <PageTransition><PageComponent /></PageTransition>
             </main>
