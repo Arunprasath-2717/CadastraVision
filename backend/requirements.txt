@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+sqlalchemy
+geoalchemy2
+psycopg2-binary
+pydantic
+pydantic-settings
+requests
+shapely
+geopandas
+pyproj
+passlib
+python-jose
+pytest
+httpx
