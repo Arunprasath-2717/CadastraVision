@@ -28,10 +28,12 @@ export function OfflineProvider({ children }) {
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('offlineActionEnqueued', refreshPendingCount);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('offlineActionEnqueued', refreshPendingCount);
     };
   }, []);
 
@@ -44,10 +46,11 @@ export function OfflineProvider({ children }) {
     setStatus(prev => ({ ...prev, state: 'syncing' }));
     try {
       await syncOfflineQueue();
+      const count = await getPendingCount();
       setStatus(prev => ({
         ...prev,
         state: 'online',
-        pendingCount: 0,
+        pendingCount: count,
         lastSyncedAt: new Date().toLocaleTimeString()
       }));
     } catch (e) {

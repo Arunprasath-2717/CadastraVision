@@ -1,8 +1,31 @@
 import { apiRequest } from './apiClient';
 import mockParcelsData from '../mocks/parcels.json';
+import { enqueueOfflineAction, getPendingActions } from '../lib/offlineQueue';
 
 // Local reactive mock memory state for demo editing / approval persistence
 let localParcels = JSON.parse(JSON.stringify(mockParcelsData.features));
+
+let isMockRestored = false;
+let restorePromise = null;
+
+async function ensureMockStateRestored() {
+  if (isMockRestored) return;
+  if (!restorePromise) {
+    restorePromise = (async () => {
+      try {
+        const pendingActions = await getPendingActions();
+        for (const action of pendingActions) {
+          parcelApi.applyMockAction(action);
+        }
+      } catch (err) {
+        console.error('Failed to restore mock state from IndexedDB', err);
+      } finally {
+        isMockRestored = true;
+      }
+    })();
+  }
+  return restorePromise;
+}
 
 /**
  * Parcel Service (PRD-CM-04 Section 3.2 & Section 23)
@@ -12,6 +35,7 @@ export const parcelApi = {
    * Get paginated parcel records
    */
   async getParcels(filters = {}) {
+    await ensureMockStateRestored();
     const query = new URLSearchParams(filters).toString();
     const res = await apiRequest(`/v1/parcels?${query}`);
     if (res && res.items) return res;
@@ -36,6 +60,7 @@ export const parcelApi = {
    * Get single parcel details
    */
   async getParcelById(parcelId) {
+    await ensureMockStateRestored();
     const res = await apiRequest(`/v1/parcels/${parcelId}`);
     if (res) return res;
 
@@ -54,6 +79,7 @@ export const parcelApi = {
    * Triggers automatic server re-validation
    */
   async editParcel(parcelId, newGeometry, actionType = 'vertex_edit') {
+    await ensureMockStateRestored();
     const payload = {
       idempotency_key: `edit-${parcelId}-${Date.now()}`,
       edit: {
@@ -79,6 +105,10 @@ export const parcelApi = {
       localParcels[featureIdx].properties.confidence_band = 'HIGH';
       localParcels[featureIdx].properties.last_updated = new Date().toISOString();
       localParcels[featureIdx].properties.updated_by = 'Muthulakshmi S. (Surveyor)';
+      
+      if (!navigator.onLine) {
+        await enqueueOfflineAction({ type: actionType, parcel_id: parcelId, payload: { geometry: newGeometry } });
+      }
     }
 
     return {
@@ -99,6 +129,7 @@ export const parcelApi = {
    * Explicit Human Approval (PRD Non-Negotiable R1)
    */
   async approveParcel(parcelId, notes = 'Boundary validated and approved') {
+    await ensureMockStateRestored();
     const payload = { notes };
 
     const res = await apiRequest(`/v1/parcels/${parcelId}/approve`, {
@@ -112,6 +143,10 @@ export const parcelApi = {
     if (feature) {
       feature.properties.validation_status = 'approved';
       feature.properties.flags = [];
+      
+      if (!navigator.onLine) {
+        await enqueueOfflineAction({ type: 'approve', parcel_id: parcelId, payload: { notes } });
+      }
     }
 
     return {
@@ -127,6 +162,7 @@ export const parcelApi = {
    * Explicit Human Rejection
    */
   async rejectParcel(parcelId, reason = 'Boundary error') {
+    await ensureMockStateRestored();
     const payload = { reason };
 
     const res = await apiRequest(`/v1/parcels/${parcelId}/reject`, {
@@ -139,6 +175,10 @@ export const parcelApi = {
     const feature = localParcels.find(f => f.properties.id === parcelId || f.id === parcelId);
     if (feature) {
       feature.properties.validation_status = 'rejected';
+      
+      if (!navigator.onLine) {
+        await enqueueOfflineAction({ type: 'reject', parcel_id: parcelId, payload: { reason } });
+      }
     }
 
     return {
@@ -148,5 +188,29 @@ export const parcelApi = {
       export_eligible: false,
       rejected_at: new Date().toISOString()
     };
+  },
+
+  /**
+   * Apply queued mock actions to the local state when coming online
+   */
+  applyMockAction(action) {
+    const featureIdx = localParcels.findIndex(f => f.properties.id === action.parcel_id || f.id === action.parcel_id);
+    if (featureIdx === -1) return false;
+    
+    if (action.action_type === 'approve') {
+      localParcels[featureIdx].properties.validation_status = 'approved';
+      localParcels[featureIdx].properties.flags = [];
+    } else if (action.action_type === 'reject') {
+      localParcels[featureIdx].properties.validation_status = 'rejected';
+    } else {
+      // assume edit
+      localParcels[featureIdx].geometry = action.payload.geometry || localParcels[featureIdx].geometry;
+      localParcels[featureIdx].properties.source = 'human-edited';
+      localParcels[featureIdx].properties.confidence_score = 0.96;
+      localParcels[featureIdx].properties.confidence_band = 'HIGH';
+      localParcels[featureIdx].properties.last_updated = action.timestamp || new Date().toISOString();
+      localParcels[featureIdx].properties.updated_by = 'Muthulakshmi S. (Surveyor)';
+    }
+    return true;
   }
 };

@@ -63,7 +63,10 @@ export async function enqueueOfflineAction(action) {
     const store = tx.objectStore(STORE_NAME);
     const req = store.add(record);
 
-    req.onsuccess = () => resolve(record);
+    req.onsuccess = () => {
+      window.dispatchEvent(new Event('offlineActionEnqueued'));
+      resolve(record);
+    };
     req.onerror = (e) => reject(e.target.error);
   });
 }
@@ -105,6 +108,24 @@ export async function getPendingActions() {
 }
 
 /**
+ * Remove a specific queued offline action
+ * @param {string} client_action_id
+ */
+export async function removeOfflineAction(client_action_id) {
+  const db = await openDB();
+  if (!db) return;
+
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.delete(client_action_id);
+
+    req.onsuccess = () => resolve(true);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+/**
  * Clear all pending actions after successful batch sync to /v1/parcels/sync
  */
 export async function clearOfflineQueue() {
@@ -131,8 +152,21 @@ export async function syncOfflineQueue(apiClient) {
   try {
     if (apiClient && typeof apiClient.syncOfflineActions === 'function') {
       await apiClient.syncOfflineActions(actions);
+      for (const action of actions) {
+        await removeOfflineAction(action.client_action_id);
+      }
+    } else {
+      const { parcelApi } = await import('../services/parcelApi.js');
+      for (const action of actions) {
+        try {
+          parcelApi.applyMockAction(action);
+          await removeOfflineAction(action.client_action_id);
+        } catch (e) {
+          console.error('Failed to apply mock action', e);
+        }
+      }
     }
-    await clearOfflineQueue();
+    
     return { synced: actions.length, conflicts: 0 };
   } catch (err) {
     console.error('Offline batch sync error:', err);
