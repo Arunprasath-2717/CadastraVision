@@ -1,0 +1,43 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# Environment secrets
+.env
+*.env
+
+# Database files (local dev SQLite)
+*.db
+*.sqlite3
+
+# pytest cache
+.pytest_cache/
+.cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Alembic generated (keep migrations, not pycache inside them)
+alembic/versions/__pycache__/
+
+# Logs
+*.log
+logs/

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Layers, ShieldAlert, ArrowLeft, CheckCircle } from 'lucide-react';
+import { authApi } from '../services/authApi';
 
 export function SignupPage() {
   const navigate = useNavigate();
@@ -15,15 +16,29 @@ export function SignupPage() {
   });
 
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.password !== formData.confirmPassword) {
       alert('Passwords do not match.');
       return;
     }
-    setSubmitted(true);
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await authApi.register(formData);
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.detail || 'Registration failed. Please verify your details and retry.');
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   return (
     <div className="min-h-screen bg-pastel-bg flex flex-col justify-center items-center p-6 relative topo-grid-pastel">
