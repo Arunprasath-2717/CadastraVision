@@ -10,6 +10,7 @@ import { ReviewValidationPage } from './pages/ReviewValidationPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { CommandCenterLayout } from './components/layout/CommandCenterLayout';
 
 function ProtectedRoute({ children }) {
@@ -43,7 +44,7 @@ export default function App() {
           <Route path="/history" element={<ProtectedRoute><CommandCenterLayout page={HistoryPage} /></ProtectedRoute>} />
           <Route path="/reports" element={<ProtectedRoute><CommandCenterLayout page={ReportsPage} /></ProtectedRoute>} />
 
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Router>
     </AuthProvider>
