@@ -10,6 +10,8 @@ export function LayerControl() {
     { key: 'buildings', label: 'Buildings', badgeColor: 'bg-slate-400' },
     { key: 'roads', label: 'Roads', badgeColor: 'bg-sky-400' },
     { key: 'flags', label: 'Validation Flags', badgeColor: 'bg-rose-400' },
+    { key: 'openfreemap', label: 'OpenFreeMap Vector', badgeColor: 'bg-indigo-400' },
+    { key: 'overpass', label: 'Overpass OSM Data', badgeColor: 'bg-pink-400' },
   ];
 
   return (

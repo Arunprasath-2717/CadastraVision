@@ -7,11 +7,14 @@ const MapContext = createContext(null);
 export function MapProvider({ children }) {
   const [selectedParcelId, setSelectedParcelId] = useState(null);
   const [selectedParcel, setSelectedParcel] = useState(null);
+  const [basemap, setBasemap] = useState('openfreemap');
   const [activeLayers, setActiveLayers] = useState({
     parcels: true,
     buildings: true,
     roads: true,
     flags: true,
+    openfreemap: true,
+    overpass: true,
   });
 
   const [isReviewQueueOpen, setIsReviewQueueOpen] = useState(true);
@@ -175,7 +178,9 @@ export function MapProvider({ children }) {
       gisConflict,
       setGisConflict,
       mapInstance,
-      setMapInstance
+      setMapInstance,
+      basemap,
+      setBasemap
     }}>
       {children}
     </MapContext.Provider>

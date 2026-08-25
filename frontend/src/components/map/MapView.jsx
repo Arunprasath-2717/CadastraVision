@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import { useMapSelection } from '../../context/MapContext';
 import { geoApi } from '../../services/geoApi';
-import { ZoomIn, ZoomOut, Compass, Loader2, Maximize2 } from 'lucide-react';
+import { overpassApi } from '../../services/overpassApi';
+import { ZoomIn, ZoomOut, Compass, Loader2, Globe, Layers } from 'lucide-react';
 
 export function MapView() {
   const mapContainerRef = useRef(null);
@@ -11,18 +12,22 @@ export function MapView() {
     activeLayers,
     selectedParcelId,
     selectParcel,
-    setMapInstance
+    setMapInstance,
+    basemap,
+    setBasemap
   } = useMapSelection();
   const selectParcelRef = useRef(selectParcel);
 
   const [loading, setLoading] = useState(true);
+  const [overpassLoading, setOverpassLoading] = useState(false);
 
   useEffect(() => {
     selectParcelRef.current = selectParcel;
   }, [selectParcel]);
 
-  // Free OpenAccess Dark / Carto Vector style
-  const basemapStyle = {
+  // OpenFreeMap vector basemap style & dark raster fallback
+  const openFreeMapStyle = 'https://tiles.openfreemap.org/styles/liberty';
+  const cartoDarkStyle = {
     version: 8,
     sources: {
       'carto-dark': {
@@ -33,7 +38,7 @@ export function MapView() {
           'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png'
         ],
         tileSize: 256,
-        attribution: '&copy; <a href="https://carto.com/">CARTO</a> &copy; OpenStreetMap'
+        attribution: '&copy; <a href="https://openfreemap.org/">OpenFreeMap</a> &copy; OpenStreetMap'
       }
     },
     layers: [
@@ -50,9 +55,10 @@ export function MapView() {
   useEffect(() => {
     if (mapRef.current) return;
 
+    // Use OpenFreeMap vector style by default, fallback to cartoDark on timeout/network issue
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: basemapStyle,
+      style: openFreeMapStyle,
       center: [77.5946, 12.9716],
       zoom: 16,
       pitch: 25,
@@ -62,6 +68,14 @@ export function MapView() {
     mapRef.current = map;
     setMapInstance(map);
 
+    // Fallback handler if vector style fails to load
+    map.on('error', (e) => {
+      if (e.error?.message?.includes('style') || e.error?.status === 404) {
+        console.warn('OpenFreeMap style fetch failed, falling back to Carto Dark:', e);
+        map.setStyle(cartoDarkStyle);
+      }
+    });
+
     map.on('load', async () => {
       const [parcelsGeoJSON, buildingsGeoJSON, roadsGeoJSON] = await Promise.all([
         geoApi.getParcelGeoJSON(),
@@ -69,9 +83,28 @@ export function MapView() {
         geoApi.getRoadsGeoJSON()
       ]);
 
+      // Fetch Overpass live OpenStreetMap data for area
+      setOverpassLoading(true);
+      const overpassGeoJSON = await overpassApi.fetchBBoxFeatures([77.58, 12.96, 77.61, 12.98]);
+      setOverpassLoading(false);
+
       map.addSource('parcels-source', { type: 'geojson', data: parcelsGeoJSON });
       map.addSource('buildings-source', { type: 'geojson', data: buildingsGeoJSON });
       map.addSource('roads-source', { type: 'geojson', data: roadsGeoJSON });
+      map.addSource('overpass-source', { type: 'geojson', data: overpassGeoJSON });
+
+      // Add Overpass OSM Layer
+      map.addLayer({
+        id: 'overpass-layer',
+        type: 'line',
+        source: 'overpass-source',
+        paint: {
+          'line-color': '#F472B6',
+          'line-width': 1.5,
+          'line-dasharray': [2, 2],
+          'line-opacity': 0.8
+        }
+      });
 
       // Add Roads Layer
       map.addLayer({
@@ -85,7 +118,7 @@ export function MapView() {
         }
       });
 
-      // Add Parcels Fill Layer (Pastel Confidence Band Colors)
+      // Add Parcels Fill Layer
       map.addLayer({
         id: 'parcels-fill-layer',
         type: 'fill',
@@ -121,7 +154,7 @@ export function MapView() {
         }
       });
 
-      // Selected Parcel Highlight Layer (Periwinkle Glow)
+      // Selected Parcel Highlight Layer
       map.addLayer({
         id: 'parcels-highlight-layer',
         type: 'line',
@@ -146,7 +179,7 @@ export function MapView() {
         }
       });
 
-      // Add Validation Flags Symbol/Circle Layer
+      // Add Validation Flags Layer
       map.addLayer({
         id: 'validation-flags-layer',
         type: 'circle',
@@ -203,6 +236,9 @@ export function MapView() {
     if (map.getLayer('validation-flags-layer')) {
       map.setLayoutProperty('validation-flags-layer', 'visibility', activeLayers.flags ? 'visible' : 'none');
     }
+    if (map.getLayer('overpass-layer')) {
+      map.setLayoutProperty('overpass-layer', 'visibility', activeLayers.overpass ? 'visible' : 'none');
+    }
   }, [activeLayers]);
 
   // Update Selected Parcel Highlight
@@ -225,7 +261,7 @@ export function MapView() {
               <span className="absolute inset-0 rounded-xl border border-[#A7EBF2]/40 animate-pulse" />
             </div>
             <div className="space-y-1.5">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#A7EBF2]">Loading spatial layers</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[#A7EBF2]">Loading OpenFreeMap vector engine</div>
               <div className="h-1.5 w-40 overflow-hidden rounded-full bg-white/10">
                 <div className="h-full w-2/3 rounded-full bg-[linear-gradient(90deg,#A7EBF2,#54ACBF,#266580)] animate-pulse" />
               </div>
@@ -236,8 +272,10 @@ export function MapView() {
 
       <div ref={mapContainerRef} className="h-full w-full" />
 
-      <div className="absolute left-4 top-4 z-10 rounded-xl border border-[#A7EBF2]/35 bg-[rgba(1,28,64,0.58)] px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-[0.2em] text-[#D7F7FF] shadow-[0_12px_24px_rgba(1,28,64,0.18)] backdrop-blur-md">
-        Sector 4 • Live GIS
+      <div className="absolute left-4 top-4 z-10 flex items-center gap-2 rounded-xl border border-[#A7EBF2]/35 bg-[rgba(1,28,64,0.75)] px-3 py-1.5 text-[11px] font-mono uppercase tracking-[0.18em] text-[#D7F7FF] shadow-[0_12px_24px_rgba(1,28,64,0.18)] backdrop-blur-md">
+        <Globe className="h-3.5 w-3.5 text-[#A7EBF2]" />
+        <span>OpenFreeMap • MapLibre GL • Overpass OSM</span>
+        {overpassLoading && <Loader2 className="h-3 w-3 animate-spin text-[#A7EBF2]" />}
       </div>
 
       <div className="absolute right-4 top-4 z-10 flex flex-col space-y-2">
