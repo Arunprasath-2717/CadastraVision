@@ -64,7 +64,7 @@ export const authApi = {
       jurisdiction: 'Bengaluru East Municipal Corp',
     };
 
-    const mockToken = 'mock_jwt_token_muthulakshmi_sih2026';
+    const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJzdXJ2ZXlvckBjYWRhc3RyYWwuZ292LmluIiwicm9sZSI6IkFOQUxZU1QifQ.demo_signature_key';
     localStorage.setItem('cadastral_jwt', mockToken);
     localStorage.setItem('cadastral_user', JSON.stringify(mockUser));
 
