@@ -1,173 +1,341 @@
-# CadastraVision — AI-Powered Cadastral Intelligence Platform
+# 🗺️ CadastraVision
 
-CadastraVision is a full-stack land administration platform designed to streamline cadastral parcel management, topological validation, conflict resolution, tamper-evident audit logging, and geospatial exports.
+### AI-Powered Cadastral Intelligence Platform
 
-> [!NOTE]
-> **AI Runtime Isolation Notice**: This integration baseline intentionally excludes AI runtime dependencies (PyTorch, FastSAM, YOLOv8). The application operates deterministically using database-backed records and GeoJSON feature endpoints. AI model services will be integrated in a subsequent phase.
+CadastraVision is a GIS + AI platform for **parcel mapping, spatial checking, change detection and surveyor review**.
+
+> **Our idea:** Let AI find possible problems faster, while the surveyor keeps the final decision.
+
+---
+
+## 🎯 Problem
+
+Cadastral work can become difficult when surveyors manually compare:
+
+- Parcel boundaries
+- Buildings and roads
+- Old and new spatial data
+- Survey information and imagery
+- Land-use changes
+
+It is also difficult to work in low-connectivity areas and maintain a clear history of changes.
+
+## 💡 Our Solution
+
+CadastraVision brings these tasks into one workflow:
+
+**Data → GIS Map → AI/Spatial Analysis → Anomaly → Risk/Confidence → Surveyor Review → Validated Record**
+
+It is mainly a **decision-support tool**. AI does not directly overwrite important land records.
+
+---
+
+## ⭐ Main Features
+
+| Feature | What it does |
+|---|---|
+| 🗺️ GIS Command Center | Shows parcels, buildings, roads and other layers |
+| 📡 Data Ingestion | Handles spatial/cadastral data and imagery workflows |
+| 🤖 AI Intelligence | Helps identify possible spatial anomalies |
+| 🔍 Change Detection | Finds possible boundary/building/land-use changes |
+| ✅ Surveyor Review | Lets a human verify, edit or escalate findings |
+| 📊 Analytics | Shows parcel, building, validation and confidence metrics |
+| 🕒 Property History | Shows important changes as a timeline |
+| 📄 Reports | Creates parcel summaries and exportable information |
+| 📴 Offline Support | Keeps supported actions locally until connection returns |
+| 🔐 Security | JWT authentication, RBAC and audit logging |
+
+---
+
+## 🖥️ Application
+
+### 1. Command Center
+The main workspace for surveyors: interactive map, layer controls, parcel inspection, data upload, review queue, quick actions and AI assistance. The map can be expanded when more space is needed.
+
+### 2. AI Intelligence
+Users can ask spatial questions such as:
+- Find parcels with boundary anomalies
+- Find overlapping building footprints
+- Find possible land-use changes
+
+Results include **confidence, risk, explanation and recommendation**.
+
+### 3. Surveyor Review
+AI findings are sent to a review queue. The surveyor checks the **parcel, issue, severity, confidence and spatial details**, then accepts, edits or escalates the finding.
+
+### 4. Spatial Analytics
+Shows parcel/building counts, road coverage, validation progress, confidence distribution, AI detection statistics and spatial trends.
+
+### 5. Property History
+Shows important parcel events such as boundary realignment, building expansion, access-lane changes and land-use updates.
+
+### 6. Cadastral Reports
+Creates structured summaries with parcel details, AI findings, validation results, surveyor decisions and change summaries.
+
+---
+
+## 🔄 How the System Works
+
+```text
+Spatial / Cadastral Data
+          ↓
+     Data Ingestion
+          ↓
+     GIS Visualization
+          ↓
+   AI + Spatial Analysis
+          ↓
+    Anomaly Detection
+          ↓
+  Risk / Confidence Score
+          ↓
+      Surveyor Review
+        ↙       ↘
+    Accept     Edit/Escalate
+        ↘       ↙
+     Validated Record
+          ↓
+ History • Analytics • Reports
+          ↓
+       Audit Trail
+```
+
+---
+
+## 🧠 AI + GIS Pipeline
+
+```text
+Drone / Spatial Imagery
+          ↓
+     Preprocessing
+          ↓
+ Feature / Object Analysis
+          ↓
+Parcel + Building Geometry
+          ↓
+    Change Detection
+          ↓
+ Topological Validation
+          ↓
+ Confidence / Risk Score
+          ↓
+     Surveyor Review
+```
+
+The repository includes **FastSAM** and **YOLOv8 segmentation model assets**.
+
+The current full-system baseline keeps heavy AI runtime dependencies separate from the main deterministic application, so the GIS/database workflow can run independently.
+
+---
+
+## 🗺️ GIS Layer
+
+- **MapLibre GL** – map rendering
+- **OpenFreeMap** – vector basemap
+- **OpenStreetMap / Overpass API** – spatial data
+- **GeoJSON** – spatial data exchange
+- **Shapely** – geometry processing
+- Parcel, building, road and field layers
+- Coordinate reference system handling
+
+---
+
+## 📴 Offline Workflow
+
+```text
+ONLINE
+Frontend → FastAPI → Database
+
+OFFLINE
+Frontend → Local Storage → Pending Queue
+                         ↓
+                  Connection Restored
+                         ↓
+                       Sync
+```
+
+Supported field actions can therefore be retained locally and synchronized later.
+
+---
+
+## 🔐 Security
+
+- JWT authentication
+- Role-Based Access Control (RBAC)
+- Protected API endpoints
+- Input/schema validation
+- CORS configuration
+- Security headers
+- Audit logging
+- SHA-256 audit chaining
 
 ---
 
 ## 🏗️ Architecture
 
-```
-React / Vite / Mapbox GL Frontend
-           │
-           │ REST API + JWT Bearer Auth
-           ▼
-FastAPI Async Backend Core
-           │
-           │ Async SQLAlchemy 2.x ORM
-           ▼
-PostgreSQL / PostGIS Database
-           │
- ┌─────────┴─────────┐
- ▼                   ▼
-Audit Log         GeoJSON / CSV Exports
-(SHA-256 Chain)
+```text
+ React + Vite Frontend
+          │
+       REST API
+       + JWT Auth
+          │
+          ▼
+     FastAPI Backend
+          │
+    ┌─────┼─────────┐
+    │     │         │
+   Auth   GIS    Validation
+    │     │         │
+    └─────┼─────────┘
+          ▼
+    SQLAlchemy Layer
+          │
+          ▼
+ SQLite (Development)
+        /
+ PostgreSQL + PostGIS
+      (Target)
 ```
 
 ---
 
-## 🌿 Authoritative Integration Sources
+## 🛠️ Tech Stack
 
-The system target branch `integration/full-system` is selectively integrated from:
+**Frontend:** React, Vite, JavaScript, Tailwind CSS, MapLibre GL, PWA/local persistence
 
-| Layer | Source Remote Branch | Description |
-|---|---|---|
-| **Database Schema** | `origin/main` | PostGIS tables & Alembic migration baseline (`7a8e910f1112`) |
-| **Backend Engine** | `origin/backend/siva-core` | FastAPI async routers, services, Pydantic schemas |
-| **Audit/Security/Export**| `origin/feature/backend-audit-security-export` | RBAC, security headers, SHA-256 audit chaining, export pipeline |
-| **Frontend UI** | `origin/frontend` | Authoritative React 18 + Vite + Mapbox GL PWA |
+**Backend:** Python, FastAPI, Pydantic, SQLAlchemy, Alembic, JWT, Shapely
+
+**Database:** SQLite for local development; PostgreSQL + PostGIS for spatial deployment
+
+**AI/GIS:** FastSAM, YOLOv8 segmentation, MapLibre GL, OpenFreeMap, OpenStreetMap, Overpass API, GeoJSON
 
 ---
 
-## ⚡ Quick Start Options
+## 📂 Project Structure
 
-### Option A: Docker Compose (Recommended)
-
-Start the full stack (PostgreSQL/PostGIS, FastAPI backend, Vite frontend) with a single command:
-
-```bash
-docker compose up --build
+```text
+CadastraVision/
+├── ai/                  # AI components
+├── ai-service/          # AI service layer
+├── backend/             # FastAPI backend
+├── database/            # Database resources
+├── docs/                # Documentation
+├── frontend/            # React application
+├── infrastructure/      # Deployment files
+├── scripts/              # Utility scripts
+├── tests/                # Tests
+├── docker-compose.yml
+├── FastSAM-s.pt
+├── yolov8n-seg.pt
+└── README.md
 ```
 
-* **Frontend App**: [http://localhost:5173](http://localhost:5173)
-* **Backend API Docs (Swagger)**: [http://localhost:8001/docs](http://localhost:8001/docs)
-* **OpenAPI Schema**: [http://localhost:8001/openapi.json](http://localhost:8001/openapi.json)
-
 ---
 
-### Option B: Local Development Setup
+## 🚀 Run Locally
 
-#### 1. Backend Server Setup
+### Backend
 
-##### For Bash / Zsh Users:
-```bash
+```powershell
 cd backend
-source .venv/bin/activate
-.venv/bin/python -m alembic upgrade head
-PYTHONPATH=. .venv/bin/python scripts/seed_demo.py
-.venv/bin/python -m uvicorn app.main:app --reload --port 8001
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+Copy-Item .env.example .env
+python -m alembic upgrade head
+python -m uvicorn app.main:app --reload --port 8001
 ```
 
-##### For Fish Shell Users:
-```fish
-cd backend
-source .venv/bin/activate.fish
-.venv/bin/python -m alembic upgrade head
-env PYTHONPATH=. .venv/bin/python scripts/seed_demo.py
-.venv/bin/python -m uvicorn app.main:app --reload --port 8001
-```
+API: `http://localhost:8001`
 
-#### 2. Frontend Application Setup
-```bash
+Swagger: `http://localhost:8001/docs`
+
+### Frontend
+
+Open another terminal:
+
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-The frontend will start at `http://localhost:5173` (or `http://localhost:5174` if 5173 is occupied).
+Vite will show the frontend URL, normally `http://localhost:5173`.
 
----
+### Docker
 
-## 🔐 Demo Credentials & RBAC Roles
+If Docker is available:
 
-The idempotent seed script (`scripts/seed_demo.py`) pre-configures three demo user accounts with server-enforced Role-Based Access Control (RBAC):
-
-| Role | Email | Password | Permissions |
-|---|---|---|---|
-| **ADMIN** | `admin@cadastravision.gov` | `Admin123!` | Full system administration, approval overrides, audit log verification, export access |
-| **ANALYST** | `surveyor@cadastravision.gov` | `Surveyor123!` | Parcel geometry editing, validation flag processing, conflict resolution |
-| **VIEWER** | `viewer@cadastravision.gov` | `Viewer123!` | Read-only access to GIS maps, parcels, and audit data. (Mutations return HTTP 403 Forbidden) |
-
----
-
-## 🧪 Testing & Verification Suite
-
-Run the full automated verification suite across all system layers:
-
-### 1. Full Master Verification Script
 ```bash
-./scripts/master_backend_verify.sh
-```
-
-### 2. Backend Pytest Test Suite (280/280 Passed)
-```bash
-cd backend
-.venv/bin/python -m pytest -q
-```
-
-### 3. Security Unit & Integration Tests (48/48 Passed)
-```bash
-cd backend
-.venv/bin/python -m pytest tests/test_security.py -v
-```
-
-### 4. Production Frontend Build (1602 Modules Transformed)
-```bash
-cd frontend
-npm run build
-```
-
-### 5. Full End-to-End (E2E) Smoke Test (8/8 Passed)
-```bash
-# Start backend server on port 8001
-cd backend
-.venv/bin/python -m uvicorn app.main:app --port 8001 &
-SERVER_PID=$!
-sleep 3
-
-# Run live E2E smoke test
-cd ..
-backend/.venv/bin/python scripts/e2e_smoke_test.py
-
-# Shutdown server
-kill $SERVER_PID
+docker compose up --build
 ```
 
 ---
 
-## 🔐 Security & Audit Subsystem
+## 🔌 Backend API
 
-* **Password Hashing**: `bcrypt` (12 rounds) with salt.
-* **Token Handling**: Standard JWT Bearer tokens with signature validation and expiration enforcement.
-* **Audit Trail**: Tamper-evident SHA-256 hash chaining on all parcel mutation events.
-* **Security Headers**: Includes `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and `X-Request-ID`.
-* **Exports**: Authorized GeoJSON, CSV, and JSON parcel exports backed by database records.
+FastAPI provides interactive Swagger documentation.
+
+Main API areas:
+
+```text
+Health
+Authentication
+Users / Roles
+Cadastral Data
+GIS / Spatial Operations
+Validation
+History / Audit
+Reports / Exports
+```
 
 ---
 
-## 🔧 Troubleshooting
+## 🚀 What Makes It Different?
 
-### Port Conflicts
-If port 8001 or 5173 is in use, terminate active processes:
-```bash
-fuser -k 8001/tcp 5173/tcp
+CadastraVision is not just a:
+
+**Map Viewer + AI Model + Database**
+
+It connects:
+
+```text
+GIS
+ +
+AI / Spatial Analysis
+ +
+Validation
+ +
+Human Review
+ +
+Offline Support
+ +
+Auditability
+        ↓
+  CadastraVision
 ```
 
-### Virtual Environment Sourcing in Fish Shell
-Do not run `source .venv/bin/activate` in Fish shell. Use:
-```fish
-source .venv/bin/activate.fish
-```
-or invoke python directly: `.venv/bin/python`.
+The key idea is **human-in-the-loop validation**: AI finds and prioritizes possible issues, while the surveyor controls the final decision.
+
+---
+
+## 🌱 Future Scope
+
+- Full production AI inference
+- Larger drone/satellite imagery pipelines
+- Better cadastral change detection
+- Orthomosaic processing
+- Mobile field-surveyor workflows
+- Government land-record integration
+- Large-scale PostGIS deployment
+- More explainable AI
+
+---
+
+## 🇮🇳 Smart India Hackathon 2026
+
+**CadastraVision — AI-Powered Cadastral Intelligence**
+
+**Goal:** Make cadastral work faster, easier to review and more traceable using GIS, AI and human validation.
+
+> **GIS intelligence with humans in control.**
